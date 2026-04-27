@@ -1,0 +1,22 @@
+# Agent Blueprints
+#
+# Defines which agents are automatically created for each workspace type.
+# Provisioned idempotently by AgentProvisioner (keyed on identifier).
+#
+# Each agent entry supports:
+#   name:               Display name
+#   instructions_prompt: Path to prompt file in app/prompts/ (without extension)
+#   instructions:       Inline instructions (overrides prompt file)
+#   tool_config:        Array of tool class names (null = use defaults)
+#   schedule:           Cron expression for scheduled runs (null = manual only)
+#   metadata:           Arbitrary config hash
+#
+# Workspace types:
+#   default — applied to all workspaces unless overridden
+#   (add custom types here as needed, selected via workspace metadata)
+
+default: {}
+  # Example: uncomment to auto-provision a manager agent for every workspace
+  # manager:
+  #   name: "Manager"
+  #   instructions_prompt: "agents/manager"

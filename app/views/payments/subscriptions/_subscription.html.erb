@@ -1,0 +1,100 @@
+<%= tag.div class: "mb-8 pb-8 border-b border-border", id: dom_id(subscription) do %>
+  <% if subscription.generic_trial? %>
+    </div>
+      </div>
+    </div>
+    <div class="lg:flex-shrink-0">
+      <%= badge t(".free_trial"), class: "mb-1" %>
+      <div class="text-muted-foreground text-sm"><%= t(".free_trial_ends", date: l(subscription.trial_ends_at.to_date, format: :long)) %></div>
+    </div>
+
+  <% else %>
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+      <div class="flex-1">
+        <!-- Status Badges -->
+        <% if subscription.canceled? %>
+          <%= badge "Canceled", class: "mb-3" %>
+        <% elsif subscription.incomplete? %>
+          <%= badge "Incomplete", class: "mb-3" %>
+        <% elsif subscription.past_due? %>
+          <%= badge "Past Due", class: "mb-3", color: "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive" %>
+        <% elsif subscription.unpaid? %>
+          <%= badge "Unpaid", class: "mb-3", color: "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive" %>
+        <% end %>
+
+        <!-- Plan Info -->
+        <div class="mb-3">
+          <div class="text-lg font-semibold text-foreground"><%= subscription.plan&.name || subscription.name %></div>
+          <% unless subscription.plan.nil? %>
+            <div class="text-base text-foreground">
+              <%= pay_amount_to_currency(subscription) %> / <%= plan_interval(subscription.plan) %>
+            </div>
+        <% end %>
+        </div>
+
+        <!-- Additional Info -->
+        <div class="space-y-1 text-sm text-muted-foreground">
+        <% if subscription.on_trial? && subscription.canceled? %>
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+              </svg>
+              Trial ends <%= l(subscription.trial_ends_at.to_date, format: :long) %>
+            </div>
+        <% elsif subscription.on_trial? %>
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+              </svg>
+              Trial ends <%= l(subscription.trial_ends_at.to_date, format: :long) %>
+            </div>
+          <% elsif subscription.on_grace_period? && subscription.ends_at.present? %>
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+              </svg>
+              Ends <%= l(subscription.ends_at.to_date, format: :long) %>
+            </div>
+          <% elsif subscription.on_grace_period? && subscription.pause_starts_at.present? %>
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+            </svg>
+              Pauses <%= l(subscription.pause_starts_at.to_date, format: :long) %>
+          </div>
+        <% elsif subscription.paused? %>
+            <div>Subscription paused</div>
+          <% end %>
+
+          <% if subscription.metered? %>
+            <%= link_to "View usage", upcoming_payments_subscription_path(subscription), class: "v-link text-sm font-medium" %>
+          <% elsif subscription.plan&.charge_per_unit? %>
+            <%= link_to "View upcoming invoice", upcoming_payments_subscription_path(subscription), class: "v-link text-sm font-medium" %>
+        <% end %>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col gap-2 lg:min-w-[200px]">
+        <% if subscription.on_grace_period? %>
+          <%= link_to "Resume", unpausing_payments_subscription_path(subscription), class: "btn btn-primary text-sm w-full" if subscription.resumable? %>
+        <% elsif subscription.active? %>
+          <%= link_to "Change Plan", edit_payments_subscription_path(subscription), class: "btn btn-primary text-sm w-full" %>
+          <%= link_to "Update Payment Method", new_payment_method_payments_subscription_path(subscription), class: "btn btn-secondary text-sm w-full", data: { turbo: false } %>
+          <%= link_to "Cancel Plan", cancelling_payments_subscription_path(subscription), class: "btn btn-secondary text-sm w-full" %>
+        <% elsif subscription.paused? %>
+          <%= link_to "Resume", unpausing_payments_subscription_path(subscription), class: "btn btn-primary text-sm w-full" %>
+          <%= link_to "Cancel Plan", cancelling_payments_subscription_path(subscription), class: "btn btn-secondary text-sm w-full" %>
+        <% elsif subscription.incomplete? %>
+          <%= link_to "Confirm Payment", pay.payment_path(subscription.latest_payment.id), class: "btn btn-primary text-sm w-full" %>
+        <% elsif subscription.past_due? %>
+          <%= link_to "Update Payment Method", new_payment_method_payments_subscription_path(subscription), class: "btn btn-primary text-sm w-full", data: { turbo: false } %>
+          <%= link_to "Cancel Plan", cancelling_payments_subscription_path(subscription), class: "btn btn-secondary text-sm w-full" %>
+        <% elsif subscription.unpaid? %>
+          <%= link_to "Update Payment Method", new_payment_method_payments_subscription_path(subscription), class: "btn btn-primary text-sm w-full", data: { turbo: false } %>
+          <%= link_to "Cancel Plan", cancelling_payments_subscription_path(subscription), class: "btn btn-secondary text-sm w-full" %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

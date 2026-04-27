@@ -1,0 +1,11 @@
+<div class="flex items-center gap-2">
+  <code class="text-xs text-muted-foreground font-mono select-all"><%= member.to_param %></code>
+  <button
+    type="button"
+    class="text-xs v-link-muted hover:underline"
+    data-member-id="<%= member.to_param %>"
+    onclick="navigator.clipboard.writeText(this.getAttribute('data-member-id')).then(() => { this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy ID', 1000) })"
+  >
+    Copy ID
+  </button>
+</div>

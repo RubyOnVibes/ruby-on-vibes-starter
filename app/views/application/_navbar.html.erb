@@ -1,0 +1,128 @@
+<%#
+  ERB Navbar with Small React Islands
+
+  The navbar structure is stable ERB. Only interactive components are React islands.
+  This prevents layout shift during Turbo navigation since the <nav> itself is server-rendered.
+
+  Islands used:
+  - NotificationsIconIsland: Bell + dropdown (uses shared NotificationBellWithDropdown)
+  - UserMenuDropdownIsland: Avatar + dropdown (uses shared UserMenuDropdown)
+
+  IMPORTANT: Placeholders must EXACTLY match React's initial render to prevent layout shift.
+%>
+
+<nav class="w-full px-4 sm:px-6 py-3 bg-surface-0 border-border" role="banner">
+  <div class="flex items-center justify-between w-full">
+    <%# Left side: App name on homepage, back arrow on other pages %>
+    <div class="flex items-center">
+      <% if current_page?(root_path) %>
+        <%# On homepage: show logo mark + app name %>
+        <%= link_to root_path, class: "flex items-center gap-3 group" do %>
+          <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
+            <span class="text-sm font-semibold text-primary-foreground tracking-tight">
+              <%= RubyOnVibes.application_name.first.upcase %>
+            </span>
+          </div>
+          <span class="text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
+            <%= RubyOnVibes.application_name %>
+          </span>
+        <% end %>
+      <% else %>
+        <%# On other pages: show back arrow to homepage %>
+        <%= link_to root_path, class: "flex items-center gap-3 group" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-foreground opacity-60 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%# Right side: Theme toggle, notifications, user menu %>
+    <div class="flex items-center gap-4">
+      <%# Theme toggle - ERB with inline JS (no React needed) %>
+      <button
+        id="theme-toggle"
+        class="p-2 rounded-lg bg-surface-1 hover:bg-surface-2 text-foreground transition-colors cursor-pointer"
+        aria-label="Toggle theme"
+      >
+        <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+        </svg>
+        <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <% if user_signed_in? %>
+        <%# Notifications Island - placeholder matches NotificationBellWithDropdown exactly %>
+        <%= react_component('NotificationsIconIsland') do %>
+          <div class="relative">
+            <button class="relative p-2 rounded-lg bg-surface-1 hover:bg-surface-2 text-foreground transition-colors" aria-label="Notifications">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </button>
+          </div>
+        <% end %>
+
+        <%# User Menu Island - placeholder matches UserMenuDropdown button exactly %>
+        <%= react_component('UserMenuDropdownIsland', {
+          avatarUrl: current_user.avatar.attached? ? url_for(current_user.avatar) : nil,
+          initials: current_user.first_name&.first&.upcase || current_user.email&.first&.upcase || "?",
+          userName: current_user.name,
+          isAdmin: current_user.admin?,
+          profilePath: edit_profile_registration_path,
+          adminPath: '/admin',
+          signOutPath: destroy_user_session_path,
+          size: 'sm'
+        }) do %>
+          <div class="relative">
+            <button class="flex items-center cursor-pointer hover:opacity-80 transition rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring" aria-label="User menu">
+              <% if current_user.avatar.attached? %>
+                <%= image_tag url_for(current_user.avatar), class: "w-8 h-8 rounded-full object-cover", alt: "#{current_user.name}'s avatar" %>
+              <% else %>
+                <span class="w-8 h-8 text-xs rounded-full flex items-center justify-center font-semibold user-avatar-initials">
+                  <%= current_user.first_name&.first&.upcase || current_user.email&.first&.upcase || "?" %>
+                </span>
+              <% end %>
+            </button>
+          </div>
+        <% end %>
+      <% else %>
+        <%# Logged out: Sign in/up links (no React needed) %>
+        <%= link_to "Sign In", new_user_session_path, class: "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors" %>
+        <%= link_to "Sign Up", new_user_registration_path, class: "text-sm font-medium px-3 py-1.5 rounded-md border border-border text-foreground hover:border-primary hover:text-primary transition-colors" %>
+      <% end %>
+    </div>
+  </div>
+</nav>
+
+<%# Theme toggle script - runs immediately, no React %>
+<script nonce="<%= content_security_policy_nonce %>">
+  (function() {
+    const toggle = document.getElementById('theme-toggle');
+    const moonIcon = document.getElementById('theme-icon-moon');
+    const sunIcon = document.getElementById('theme-icon-sun');
+
+    function updateIcons() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (isDark) {
+        moonIcon.classList.add('hidden');
+        sunIcon.classList.remove('hidden');
+      } else {
+        moonIcon.classList.remove('hidden');
+        sunIcon.classList.add('hidden');
+      }
+    }
+
+    // Set initial state
+    updateIcons();
+
+    toggle.addEventListener('click', function() {
+      const isDark = document.documentElement.classList.contains('dark');
+      document.documentElement.classList.toggle('dark', !isDark);
+      localStorage.setItem('theme', isDark ? 'light' : 'dark');
+      updateIcons();
+    });
+  })();
+</script>

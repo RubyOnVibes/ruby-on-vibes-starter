@@ -1,0 +1,52 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "8cf3c9b4a5972a52df019b50b4d9735384693435c0b3f999d9bbd642ab612a99",
+      "check_name": "MassAssignment",
+      "message": "Specify exact keys allowed for mass assignment instead of using `permit!` which allows any keys",
+      "file": "app/controllers/payments/checkout_controller.rb",
+      "line": 53,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.fetch(:metadata, {}).permit!",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Payments::CheckoutController",
+        "method": "metadata_params"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        915
+      ],
+      "note": "Stripe metadata is passed as arbitrary key-value pairs to Stripe API, not used for ActiveRecord mass assignment. This is safe and intentional."
+    },
+    {
+      "warning_type": "Dynamic Render Path",
+      "warning_code": 15,
+      "fingerprint": "cdb21a872a1f059bce7d26f66d76533f8475e18fb979f7d5434da49e59ae4133",
+      "check_name": "Render",
+      "message": "Render path contains parameter value",
+      "file": "app/views/agent_tasks/show.html.erb",
+      "line": 111,
+      "link": "https://brakemanscanner.org/docs/warning_types/dynamic_render_path/",
+      "code": "render(partial => \"agent_tasks/results/#{current_workspace.agent_tasks.find_by_prefix_id!(params[:id]).kind.gsub(/[^a-z0-9_]/, \"\")}\", { :locals => ({ :task => current_workspace.agent_tasks.find_by_prefix_id!(params[:id]), :result => current_workspace.agent_tasks.find_by_prefix_id!(params[:id]).result }) })",
+      "render_path": null,
+      "location": {
+        "type": "template",
+        "template": "agent_tasks/show"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "Kind is validated on the model (lowercase alphanumeric + underscores only), sanitized via gsub in the view, and checked via lookup_context.exists? before render. Three layers of defense against path traversal."
+    }
+  ],
+  "updated": "2026-03-23 14:30:00 -0400",
+  "brakeman_version": "7.1.1"
+}
+

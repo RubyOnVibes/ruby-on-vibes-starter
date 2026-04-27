@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+# SolidQueue worker for background jobs
+# Handles: emails, exports, maintenance tasks, etc.
+# See Mission Control at /jobs for monitoring
+
+require_relative "../config/environment"
+require "solid_queue/cli"
+
+SolidQueue::Cli.start(ARGV)

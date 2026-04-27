@@ -1,0 +1,53 @@
+#!/bin/bash
+# SSR Server Launcher
+# Intelligently chooses between volume (hot-updated) and image SSR bundles
+# Ensures SSR always uses the most recent bundle available
+
+set -e
+
+# CRITICAL: Choose SSR bundle path based on WHERE the app is running from
+# This prevents loading stale bundles from the wrong location
+#
+# Rules:
+#   - Volume boot → ONLY use volume SSR (no image fallback to prevent staleness)
+#   - Image boot → ONLY use image SSR (standard Rails deployment)
+
+# Detect where we're running from
+if [ "${USE_MOUNTED_VIBES}" = "true" ] && [ -f "/mnt/data/code/config.ru" ]; then
+  # Running from volume - ONLY check volume
+  if [ -f "/mnt/data/code/vite/ssr/ssr.js" ]; then
+    SSR_BUNDLE="/mnt/data/code/vite/ssr/ssr.js"
+    echo "🔄 [SSR] Using volume bundle (hot-updated code)"
+  else
+    SSR_BUNDLE=""
+  fi
+else
+  # Running from image - ONLY check image
+  if [ -f "/rails/vite/ssr/ssr.js" ]; then
+    SSR_BUNDLE="/rails/vite/ssr/ssr.js"
+    echo "📦 [SSR] Using image bundle (standard deployment)"
+  else
+    SSR_BUNDLE=""
+  fi
+fi
+
+# Exit gracefully if no bundle found in the active location
+if [ -z "$SSR_BUNDLE" ]; then
+  echo "⏭️  [SSR] No SSR bundle found - skipping SSR server"
+  echo "   Checked:"
+  echo "     - /mnt/data/code/vite/ssr/ssr.js (volume)"
+  echo "     - /rails/vite/ssr/ssr.js (image)"
+  echo "   This is normal if SSR was removed by a deployment."
+  echo "   Rebuild SSR with 'yarn vite build --ssr' and restart to re-enable."
+  exit 0
+fi
+
+echo "🚀 [SSR] Starting Inertia SSR server"
+echo "   Bundle: ${SSR_BUNDLE}"
+echo "   Port: 13714 (localhost only)"
+echo "   Supervisor: vibes-server (auto-restart)"
+echo ""
+
+# Start SSR server
+# This process is supervised by vibes-server - will auto-restart on crash or hot reload
+exec node "${SSR_BUNDLE}"

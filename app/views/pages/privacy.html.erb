@@ -1,0 +1,59 @@
+<%# Privacy Policy - placeholder page, AI can customize with app-specific details %>
+
+<% content_for :title do %>
+  Privacy Policy — <%= RubyOnVibes.application_name %>
+<% end %>
+
+<div class="container m-auto py-16 px-4 max-w-3xl">
+  <h1 class="text-4xl font-bold tracking-tight text-foreground mb-8">Privacy Policy</h1>
+
+  <div class="prose prose-lg text-muted-foreground space-y-6">
+    <p class="text-sm text-muted-foreground">Last updated: <%= Date.today.strftime("%B %d, %Y") %></p>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Introduction</h2>
+      <p>
+        <%= RubyOnVibes.application_name %> ("we", "our", or "us") is committed to protecting your privacy.
+        This Privacy Policy explains how we collect, use, and safeguard your information when you use our service.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Information We Collect</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Account information:</strong> Name, email address, and password when you create an account.</li>
+        <li><strong>Usage data:</strong> How you interact with our service, including pages visited and features used.</li>
+        <li><strong>Device information:</strong> Browser type, operating system, and device identifiers.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">How We Use Your Information</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>To provide and maintain our service.</li>
+        <li>To notify you about changes to our service.</li>
+        <li>To provide customer support.</li>
+        <li>To detect, prevent, and address technical issues.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Data Security</h2>
+      <p>
+        We implement appropriate security measures to protect your personal information.
+        However, no method of transmission over the Internet is 100% secure.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Contact Us</h2>
+      <p>
+        If you have any questions about this Privacy Policy, please contact us through our application.
+      </p>
+    </section>
+  </div>
+
+  <div class="mt-12 pt-8 border-t border-border">
+    <%= link_to "← Back to Home", root_path, class: "text-sm font-medium text-primary hover:underline" %>
+  </div>
+</div>

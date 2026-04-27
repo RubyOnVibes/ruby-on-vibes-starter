@@ -1,0 +1,3 @@
+# ChatRun fixtures
+# Note: The unique partial index on (chat_id WHERE status IN (0,1)) means
+# only ONE active run per chat. Tests create their own runs as needed.

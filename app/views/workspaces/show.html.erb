@@ -1,0 +1,182 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <!-- Main content -->
+  <main class="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-12 lg:py-6">
+    <div class="max-w-4xl">
+      <% if @workspace.personal? %>
+        <div class="flex items-center gap-3 mb-6 pb-6 border-b border-border">
+          <%= workspace_avatar @workspace, css_class: "w-12 h-12", pixel_size: 48 %>
+          <div>
+          <h1 class="text-2xl font-semibold text-foreground"><%= @workspace.name %></h1>
+            <p class="text-sm text-muted-foreground mt-0.5">Personal Workspace</p>
+          </div>
+        </div>
+        
+        <div class="flex items-start gap-3 mb-8 text-muted-foreground">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0 mt-0.5">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+          <p class="text-sm">This is your personal workspace.</p>
+        </div>
+        
+        <!-- Member Info for Personal Org -->
+        <div class="mb-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Your Member ID</h2>
+          <% member = @workspace.members.first %>
+          <% if member %>
+            <div class="py-4 border-b border-border">
+              <div class="flex items-center gap-4">
+                <%= image_tag avatar_url(member.user), class: "w-12 h-12 rounded-full flex-shrink-0" %>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-foreground text-base truncate"><%= member.user.name || member.user.email %></div>
+                  <div class="mt-1">
+                    <%= render "workspaces/members/copyable_id", member: member %>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    Share this ID to let others add you to group chats
+                  </p>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <!-- Header -->
+        <div class="mb-8 pb-6 border-b border-border">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+            <div class="flex items-center gap-3">
+              <%= workspace_avatar @workspace, css_class: "w-12 h-12", pixel_size: 48 %>
+              <h1 class="text-2xl font-semibold text-foreground"><%= @workspace.name %></h1>
+            </div>
+            
+            <div class="flex items-center gap-3 flex-shrink-0">
+              <% if current_workspace != @workspace %>
+                <%= enter_workspace_button @workspace, label: "Enter", class: "text-sm font-medium v-link hover:underline cursor-pointer", form_class: "inline-block" %>
+              <% end %>
+              <% if !@workspace.personal? && workspace_admin?(@workspace, current_user) %>
+                <%= link_to "Settings", edit_workspace_path(@workspace), class: "text-sm font-medium v-link hover:underline" %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Members -->
+        <div class="mb-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Team Members</h2>
+          
+          <div>
+            <!-- Active Members -->
+            <% @workspace.members.includes(:user).each do |member| %>
+              <% user = member.user %>
+              <div class="group py-4 border-b border-border hover:bg-surface-1 transition-colors -mx-4 px-4">
+                <div class="flex items-center gap-4">
+                  <%= image_tag avatar_url(user), class: "w-12 h-12 rounded-full flex-shrink-0" %>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-foreground text-base truncate"><%= user.name || user.email %></div>
+                    <div class="text-sm text-muted-foreground"><%= member_role_labels(@workspace, member).join(", ") %></div>
+                    <div class="mt-1">
+                      <%= render "workspaces/members/copyable_id", member: member %>
+                    </div>
+                  </div>
+                  <% if workspace_admin?(@workspace, current_user) %>
+                    <%= link_to "Edit", edit_workspace_member_path(@workspace, member), class: "text-sm v-link-muted flex-shrink-0" %>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+
+            <!-- Pending Invitations -->
+            <% @workspace.invitations.each do |invitation| %>
+              <div class="group py-4 border-b border-border hover:bg-surface-1 transition-colors -mx-4 px-4">
+                <div class="flex items-center gap-4">
+                  <%= image_tag avatar_url(invitation), class: "w-12 h-12 rounded-full flex-shrink-0" %>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-semibold text-foreground text-base truncate"><%= invitation.name %></span>
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-surface-2 text-muted-foreground">Pending</span>
+                    </div>
+                    <div class="text-sm text-muted-foreground"><%= member_role_labels(@workspace, invitation).join(", ") %></div>
+                  </div>
+                  <% if workspace_admin?(@workspace, current_user) %>
+                    <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 self-center">
+                      <%= button_to "Resend", resend_workspace_invitation_path(@workspace, invitation), class: "text-sm v-link-muted leading-none", form_class: "inline-flex" %>
+                      <button type="button" 
+                              class="text-sm v-link-muted whitespace-nowrap copy-invitation-link leading-none"
+                              data-url="<%= invitation_url(invitation) %>">
+                        Copy Link
+                      </button>
+                      <%= link_to "Edit", edit_workspace_invitation_path(@workspace, invitation), class: "text-sm v-link-muted leading-none" %>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%= link_to "Invite Team Member", new_workspace_invitation_path(@workspace), class: "text-sm font-medium v-link hover:underline" if !@workspace.personal? && workspace_admin?(@workspace, current_user) %>
+      <% end %>
+    </div>
+  </main>
+</div>
+
+<%= render "shared/turbo_script" do %>
+  const copyButtons = document.querySelectorAll('.copy-invitation-link');
+  
+  if (!copyButtons.length) return;
+  
+  function copyToClipboard(e) {
+    const btn = e.currentTarget;
+    const url = btn.getAttribute('data-url');
+    
+    if (!url) return;
+    
+    // Modern clipboard API with fallback
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(() => {
+        showSuccess(btn);
+      }).catch(() => {
+        console.error('Clipboard copy failed');
+      });
+    } else {
+      // Fallback for non-secure contexts
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess(btn);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      } finally {
+        textArea.remove();
+      }
+    }
+  }
+  
+  function showSuccess(btn) {
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('opacity-75');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('opacity-75');
+    }, 1500);
+  }
+  
+  copyButtons.forEach(btn => {
+    btn.addEventListener('click', copyToClipboard);
+  });
+  
+  // Cleanup
+  return () => {
+    copyButtons.forEach(btn => {
+      btn.removeEventListener('click', copyToClipboard);
+    });
+  };
+<% end %>

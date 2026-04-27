@@ -1,0 +1,65 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-xl">
+      <!-- Breadcrumb -->
+      <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-8">
+        <%= link_to @workspace.name, @workspace, class: "hover:text-foreground transition-colors" %>
+        <span class="opacity-40">/</span>
+        <span>Members</span>
+      </nav>
+
+      <!-- Member identity -->
+      <div class="flex items-center gap-4 mb-10">
+        <%= image_tag avatar_url(@member.user, size: 64), class: "w-16 h-16 rounded-full" %>
+        <div>
+          <h1 class="text-2xl font-semibold text-foreground tracking-tight"><%= @member.user.name %></h1>
+          <p class="text-muted-foreground"><%= @member.user.email %></p>
+        </div>
+      </div>
+
+      <%= form_with(model: [@workspace, @member], url: workspace_member_path(@workspace, @member), method: :patch) do |form| %>
+        <%= render "error_messages", resource: form.object %>
+
+        <!-- Roles -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-4">Roles</h2>
+          
+          <div class="space-y-4">
+            <% Member::ROLES.each do |role| %>
+              <% disabled = role == :admin && @member.workspace_owner? %>
+              <label class="flex items-start gap-3 <%= disabled ? 'opacity-50' : 'cursor-pointer' %>">
+                <%= form.check_box role, class: "mt-1 w-4 h-4 rounded border-input dark:border-border text-primary focus:ring-ring focus:ring-offset-0", disabled: disabled %>
+                <div>
+                  <span class="block font-medium text-foreground"><%= role.to_s.titleize %></span>
+                  <span class="block text-sm text-muted-foreground leading-relaxed">
+                    <% if role == :admin %>
+                      Manage workspace settings, billing, and members<%= " · Required for owner" if @member.workspace_owner? %>
+                    <% elsif role == :member %>
+                      Access workspace resources
+                    <% end %>
+                  </span>
+                </div>
+              </label>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between pt-8 border-t border-border">
+          <div class="flex items-center gap-4">
+            <%= form.submit "Save changes", class: "btn btn-sm btn-primary" %>
+            <%= link_to "Cancel", @workspace, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" %>
+          </div>
+          
+          <% unless @member.workspace_owner? %>
+            <%= button_to workspace_member_path(@workspace, @member), method: :delete, class: "text-sm text-destructive/60 hover:text-destructive transition-colors", data: { turbo_confirm: "Remove #{@member.user.name} from this workspace?" } do %>
+              Remove member
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </main>
+</div>

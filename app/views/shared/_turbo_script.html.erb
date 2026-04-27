@@ -1,0 +1,124 @@
+<%#
+  Turbo-Compatible Inline Script Partial
+  
+  Handles proper lifecycle management with Turbo Drive:
+  - Mounts on initial load and after Turbo navigation
+  - Cleans up before page cache (back/forward)
+  - Prevents double-initialization
+  - Self-cleaning event listeners
+  - Error handling
+  
+  Usage:
+    render "shared/turbo_script" do
+      const button = document.getElementById('my-button');
+      if (!button) return; // Guard against missing elements
+      
+      function handleClick(e) {
+        console.log('clicked', e);
+      }
+      
+      button.addEventListener('click', handleClick);
+      
+      // Return cleanup function (optional but recommended)
+      return () => {
+        button.removeEventListener('click', handleClick);
+      };
+    end
+  
+  Advanced usage with multiple cleanups:
+    render "shared/turbo_script" do
+      const cleanups = [];
+      
+      // Setup 1
+      const btn = document.getElementById('btn');
+      if (btn) {
+        const handler = () => console.log('clicked');
+        btn.addEventListener('click', handler);
+        cleanups.push(() => btn.removeEventListener('click', handler));
+      }
+      
+      // Setup 2  
+      const timer = setInterval(() => console.log('tick'), 1000);
+      cleanups.push(() => clearInterval(timer));
+      
+      // Return combined cleanup
+      return () => cleanups.forEach(fn => fn());
+    end
+%>
+
+<script nonce="<%= content_security_policy_nonce %>">
+(() => {
+  'use strict';
+  
+  const scriptId = 'script_<%= SecureRandom.hex(8) %>';
+  let cleanup = null;
+  let mounted = false;
+  
+  function mount() {
+    // Prevent double-mounting
+    if (mounted) return;
+    
+    try {
+      // Execute user code and capture cleanup function
+      const result = (() => {
+        <%= yield %>
+      })();
+      
+      // Store cleanup if provided
+      if (typeof result === 'function') {
+        cleanup = result;
+      }
+      
+      mounted = true;
+    } catch (error) {
+      console.error('[turbo_script] Mount error:', error);
+    }
+  }
+  
+  function unmount() {
+    if (!mounted) return;
+    
+    try {
+      // Run user cleanup
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
+    } catch (error) {
+      console.error('[turbo_script] Cleanup error:', error);
+    } finally {
+      cleanup = null;
+      mounted = false;
+    }
+  }
+  
+  // Cleanup and remount on navigation
+  function handleLoad() {
+    unmount();
+    mount();
+  }
+  
+  // Cleanup before caching for back/forward
+  function handleBeforeCache() {
+    unmount();
+  }
+  
+  // Register lifecycle hooks
+  document.addEventListener('turbo:load', handleLoad);
+  document.addEventListener('turbo:before-cache', handleBeforeCache);
+  
+  // Initial mount (for first page load without Turbo)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+  
+  // Global cleanup registry (for debugging in console: window.__turboScripts)
+  if (typeof window.__turboScripts === 'undefined') {
+    window.__turboScripts = new Map();
+  }
+  window.__turboScripts.set(scriptId, { unmount, mounted: () => mounted });
+})();
+</script>
+
+

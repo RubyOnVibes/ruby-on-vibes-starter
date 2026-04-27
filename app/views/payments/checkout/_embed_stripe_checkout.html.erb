@@ -1,0 +1,88 @@
+<div x-data="{
+       stripePublicKey: '<%= Pay::Stripe.public_key %>',
+       clientSecret: '<%= client_secret %>',
+       checkout: null,
+       loading: true,
+       error: null,
+       
+       async initStripe() {
+         try {
+           // Wait for Stripe.js to be available
+           if (typeof Stripe === 'undefined') {
+             await this.waitForStripe();
+           }
+           
+           // Validate configuration
+           if (!this.stripePublicKey?.startsWith('pk_')) {
+             throw new Error('Invalid Stripe configuration');
+           }
+           
+           // Initialize Stripe
+           const stripe = Stripe(this.stripePublicKey);
+           
+           // Create embedded checkout
+           this.checkout = await stripe.initEmbeddedCheckout({
+             clientSecret: this.clientSecret
+           });
+           
+           // Mount to the empty container (must be empty!)
+           const container = this.$refs.stripeContainer;
+           this.checkout.mount(container);
+           this.loading = false;
+           
+           console.log('✅ Stripe embedded checkout mounted');
+         } catch (err) {
+           console.error('❌ Stripe checkout error:', err);
+           this.error = err.message.includes('timeout') 
+             ? 'Payment system is taking longer than expected to load.'
+             : 'Unable to load payment form.';
+           this.loading = false;
+         }
+       },
+       
+       waitForStripe() {
+         return new Promise((resolve, reject) => {
+           const timeout = setTimeout(() => reject(new Error('Stripe.js load timeout')), 10000);
+           const interval = setInterval(() => {
+             if (typeof Stripe !== 'undefined') {
+               clearInterval(interval);
+               clearTimeout(timeout);
+               resolve();
+             }
+           }, 100);
+         });
+       },
+       
+       cleanup() {
+         if (this.checkout) {
+           try {
+             this.checkout.destroy();
+             this.checkout = null;
+             console.log('🧹 Stripe checkout cleaned up');
+           } catch (e) {
+             console.debug('Stripe cleanup skipped:', e.message);
+           }
+         }
+       }
+     }"
+     x-init="initStripe()"
+     x-effect="$el._x_cleanups = $el._x_cleanups || []; $el._x_cleanups.push(() => cleanup())"
+     @turbo:before-visit.window="cleanup()"
+     class="bg-card border-card border rounded-2xl shadow-sm p-6 lg:p-8">
+  
+  <!-- Loading State -->
+  <div x-show="loading" class="text-center p-8">
+    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <p class="mt-4 text-muted-foreground">Loading checkout...</p>
+  </div>
+  
+  <!-- Error State -->
+  <div x-show="error" class="text-center p-8">
+    <p class="text-destructive font-medium mb-2" x-text="error"></p>
+    <p class="text-sm text-muted-foreground">Please refresh the page or contact support if this continues.</p>
+  </div>
+  
+  <!-- Empty container for Stripe (must have no children!) -->
+  <div x-ref="stripeContainer" x-show="!loading && !error"></div>
+</div>
+

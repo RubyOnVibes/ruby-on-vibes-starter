@@ -1,0 +1,61 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-xl">
+      <!-- Header (hidden on mobile where navbar dropdown shows title) -->
+      <div class="hidden lg:block mb-10">
+        <h1 class="text-2xl font-semibold text-foreground tracking-tight">Billing</h1>
+      </div>
+
+      <% if current_member&.admin? %>
+
+        <!-- Subscription Status -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Plan</h2>
+          
+          <% if @subscriptions.any? %>
+            <%= render partial: "payments/subscriptions/subscription", collection: @subscriptions %>
+          <% else %>
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-muted-foreground">No active subscription</p>
+              <%= link_to "Choose plan", pricing_path, class: "text-sm font-medium text-foreground hover:opacity-70 transition-opacity" %>
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Billing Information -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Billing details</h2>
+          
+          <%= form_with model: current_workspace, url: payments_path do |f| %>
+            <div class="space-y-5">
+              <div>
+                <%= f.label :billing_email, "Email", class: "block text-sm font-medium text-foreground mb-2" %>
+                <%= f.email_field :billing_email, 
+                    placeholder: current_workspace.email.presence || current_user.email,
+                    class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+              </div>
+
+              <div>
+                <%= f.label :extra_billing_info, "Additional info", class: "block text-sm font-medium text-foreground mb-2" %>
+                <%= f.text_area :extra_billing_info, 
+                    rows: 3,
+                    placeholder: "Tax ID, VAT, company address, PO number…",
+                    class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow resize-none" %>
+              </div>
+
+              <%= f.button "Save", class: "btn btn-sm btn-primary", data: { disable_with: "Saving…" } %>
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Payment History -->
+        <%= render partial: "charges" %>
+
+      <% else %>
+        <p class="text-muted-foreground"><%= t(".contact_admin", account: current_workspace.name) %></p>
+      <% end %>
+    </div>
+  </main>
+</div>

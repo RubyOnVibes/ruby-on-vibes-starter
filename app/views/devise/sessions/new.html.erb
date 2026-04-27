@@ -1,0 +1,52 @@
+<div class="max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl mx-auto">
+  <div class="text-center mb-8">
+    <h1 class="text-2xl font-bold">Welcome back</h1>
+    <p class="mt-2 text-sm">Sign in to get started</p>
+  </div>
+
+    <%= form_for(resource, as: resource_name, url: session_path(resource_name), class: "space-y-4") do |f| %>
+      <div>
+        <%= f.label :email, class: "block text-sm font-medium mb-2" %>
+        <%= f.email_field :email,
+            autofocus: true, 
+            autocomplete: "email",
+            class: "w-full px-3 py-2 md:px-4 md:py-2.5 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm md:text-base",
+            placeholder: "Enter your email" %>
+      </div>
+
+    <%# Alpine.js example - see docs/ada.md → "Alpine.js" section %>
+    <div x-data="{ showPassword: false }">
+      <%= f.label :password, class: "block text-sm font-medium mb-2" do %>
+        Password
+        <% if @minimum_password_length %>
+          <span class="text-xs">(<%= @minimum_password_length %> characters minimum)</span>
+        <% end %>
+      <% end %>
+      <div style="position: relative; margin-top: 0.75rem;">
+        <input type="password"
+               :type="showPassword ? 'text' : 'password'"
+               name="user[password]"
+               id="user_password"
+               autocomplete="current-password"
+               style="margin-top: 0;"
+               class="w-full px-3 py-2 md:px-4 md:py-2.5 pr-10 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm md:text-base"
+               placeholder="Enter your password">
+        <button type="button"
+                @click="showPassword = !showPassword"
+                style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);"
+                class="text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer">
+          <%= render "devise/shared/password_toggle_icons" %>
+        </button>
+      </div>
+    </div>
+
+
+      <div class="mt-6">
+        <%= f.submit "Continue", 
+            class: "w-full py-3 px-4 bg-foreground hover:bg-foreground/90 text-white text-base font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors" %>
+      </div>
+    <% end %>
+
+    <%= render "devise/shared/links" %>
+  </div>
+</div>

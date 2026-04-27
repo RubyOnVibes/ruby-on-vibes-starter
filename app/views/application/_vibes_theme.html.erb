@@ -1,0 +1,315 @@
+<%#
+  VIBES THEME - Web Application Styles
+
+  DO NOT edit color values in this file directly!
+  To customize brand colors, edit the vibes_tokens method in:
+  app/helpers/vibes_helper.rb
+
+  This keeps web and email themes synchronized.
+
+  STYLING APPROACH:
+  - Tailwind v4 @theme (in vibes_theme.css) registers semantic color names
+  - Tailwind auto-generates utilities: bg-primary, text-foreground, border-border, etc.
+  - In CDN mode: a <style type="text/tailwindcss"> block below provides the @theme inline block
+  - In build mode (Propshaft/Vite): vibes_theme.css is imported in the CSS entry point
+  - Component classes (btn-*, v-link, v-carousel) bundle multiple CSS properties
+  - Never invent new v-* prefixed classes - use standard Tailwind utilities or btn-* for buttons
+  - NEVER use Tailwind default palette colors (gray-*, blue-*, red-*, etc.) — they are disabled
+  - ONLY use semantic color names: primary, foreground, muted, destructive, surface-*, etc.
+-%>
+<% tokens = vibes_tokens %>
+<style id="vibes-theme"<%= safe_nonce_attr %>>
+    :root {
+    /* Primitives — full rgb() values generated from vibes_tokens helper.
+       These are the raw color values; --color-* semantics reference them. */
+    --vibes-surface-0: rgb(<%= tokens[:surface_0] %>);
+    --vibes-surface-1: rgb(<%= tokens[:surface_1] %>);
+    --vibes-surface-2: rgb(<%= tokens[:surface_2] %>);
+    --vibes-surface-3: rgb(<%= tokens[:surface_3] %>);
+    --vibes-text-1: rgb(<%= tokens[:text_1] %>);
+    --vibes-text-2: rgb(<%= tokens[:text_2] %>);
+    --vibes-brand: rgb(<%= tokens[:brand] %>);
+    --vibes-brand-contrast: rgb(<%= tokens[:brand_contrast] %>);
+    --vibes-accent: rgb(<%= tokens[:accent] %>);
+    --vibes-secondary: rgb(<%= tokens[:secondary] %>);
+    --vibes-danger: rgb(<%= tokens[:danger] %>);
+    --vibes-ring: var(--vibes-brand);
+
+    /* Typography */
+    --vibes-font-body: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    --vibes-font-heading: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+
+    /* Status primitives */
+    --vibes-info: rgb(<%= tokens[:info] %>);
+    --vibes-info-contrast: rgb(<%= tokens[:info_contrast] %>);
+    --vibes-warning: rgb(<%= tokens[:warning] %>);
+    --vibes-warning-contrast: rgb(<%= tokens[:warning_contrast] %>);
+    --vibes-success: rgb(<%= tokens[:success] %>);
+    --vibes-success-contrast: rgb(<%= tokens[:success_contrast] %>);
+
+    /* Chart primitives */
+    --vibes-chart-1: rgb(<%= tokens[:chart_1] %>);
+    --vibes-chart-2: rgb(<%= tokens[:chart_2] %>);
+    --vibes-chart-3: rgb(<%= tokens[:chart_3] %>);
+    --vibes-chart-4: rgb(<%= tokens[:chart_4] %>);
+    --vibes-chart-5: rgb(<%= tokens[:chart_5] %>);
+
+    /* =================================================================
+       SEMANTIC COLOR SYSTEM
+       These --color-* variables hold full CSS color values (rgb(...)).
+       Use var(--color-*) directly — no rgb() wrapper needed.
+       Opacity: use color-mix(in srgb, var(--color-*) 50%, transparent)
+
+       Tailwind @theme inline references these same --vibes-* vars,
+       so bg-primary / text-foreground / etc. are auto-generated.
+       These :root vars exist for component classes that need them.
+       ================================================================= */
+
+    /* Core semantic colors */
+    --color-background: var(--vibes-surface-0);
+    --color-foreground: var(--vibes-text-1);
+    --color-muted: var(--vibes-surface-1);
+    --color-muted-foreground: var(--vibes-text-2);
+    --color-primary: var(--vibes-brand);
+    --color-primary-foreground: var(--vibes-brand-contrast);
+    --color-secondary: var(--vibes-secondary);
+    --color-secondary-foreground: var(--vibes-text-1);
+    --color-accent: var(--vibes-accent);
+    --color-accent-foreground: var(--vibes-text-1);
+    --color-destructive: var(--vibes-danger);
+    --color-destructive-foreground: #fff;
+
+    /* Border and input */
+    --color-border: var(--vibes-surface-3);
+    --color-input: var(--vibes-surface-3);
+    --color-ring: var(--vibes-ring);
+
+    /* Card (same as background by default) */
+    --color-card: var(--vibes-surface-0);
+    --color-card-foreground: var(--vibes-text-1);
+
+    /* Popover (dropdowns, tooltips, modals) */
+    --color-popover: var(--vibes-surface-0);
+    --color-popover-foreground: var(--vibes-text-1);
+
+    /* Surface levels (for layered UI) */
+    --color-surface-0: var(--vibes-surface-0);
+    --color-surface-1: var(--vibes-surface-1);
+    --color-surface-2: var(--vibes-surface-2);
+    --color-surface-3: var(--vibes-surface-3);
+
+    /* Status colors */
+    --color-info: var(--vibes-info);
+    --color-info-foreground: var(--vibes-info-contrast);
+    --color-warning: var(--vibes-warning);
+    --color-warning-foreground: var(--vibes-warning-contrast);
+    --color-success: var(--vibes-success);
+    --color-success-foreground: var(--vibes-success-contrast);
+
+    /* Chart colors (data visualization) */
+    --color-chart-1: var(--vibes-chart-1);
+    --color-chart-2: var(--vibes-chart-2);
+    --color-chart-3: var(--vibes-chart-3);
+    --color-chart-4: var(--vibes-chart-4);
+    --color-chart-5: var(--vibes-chart-5);
+
+    /* Inputs */
+    --input-focus: var(--vibes-info);
+
+    /* Component helpers (legacy - prefer --color-* above) */
+    --component-header-bg: var(--vibes-surface-0);
+    --component-card-bg: var(--vibes-surface-0);
+    --component-card-border: var(--vibes-surface-3);
+    }
+
+    <% dark_tokens = vibes_tokens_dark %>
+    [data-theme="dark"], html.dark {
+    /* Dark mode only overrides primitives — semantic --color-* vars
+       are identical mappings and cascade automatically. */
+    --vibes-surface-0: rgb(<%= dark_tokens[:surface_0] %>);
+    --vibes-surface-1: rgb(<%= dark_tokens[:surface_1] %>);
+    --vibes-surface-2: rgb(<%= dark_tokens[:surface_2] %>);
+    --vibes-surface-3: rgb(<%= dark_tokens[:surface_3] %>);
+    --vibes-text-1: rgb(<%= dark_tokens[:text_1] %>);
+    --vibes-text-2: rgb(<%= dark_tokens[:text_2] %>);
+    --vibes-brand: rgb(<%= dark_tokens[:brand] %>);
+    --vibes-brand-contrast: rgb(<%= dark_tokens[:brand_contrast] %>);
+    --vibes-accent: rgb(<%= dark_tokens[:accent] %>);
+    --vibes-secondary: rgb(<%= dark_tokens[:secondary] %>);
+    --vibes-danger: rgb(<%= dark_tokens[:danger] %>);
+    --vibes-ring: var(--vibes-brand);
+    --input-focus: var(--vibes-info);
+
+    /* Chart primitives (dark variants) */
+    --vibes-chart-1: rgb(<%= dark_tokens[:chart_1] %>);
+    --vibes-chart-2: rgb(<%= dark_tokens[:chart_2] %>);
+    --vibes-chart-3: rgb(<%= dark_tokens[:chart_3] %>);
+    --vibes-chart-4: rgb(<%= dark_tokens[:chart_4] %>);
+    --vibes-chart-5: rgb(<%= dark_tokens[:chart_5] %>);
+    }
+</style>
+
+<!-- Component classes (multi-property styles that Tailwind utilities can't replace) -->
+<style id="vibes-components"<%= safe_nonce_attr %>>
+    /* =================================================================
+       COMPONENT CLASSES
+       These are legitimate custom classes that bundle multiple CSS properties.
+       They have semantic meaning beyond single utilities.
+
+       NOTE: --color-* vars now hold full color values (rgb(...)).
+       Use var(--color-*) directly. For opacity, use color-mix().
+       ================================================================= */
+
+    /* Typography base */
+    body { font-family: var(--vibes-font-body); }
+
+    /* Link components */
+    .v-link { color: var(--color-primary); text-decoration: none; }
+    .v-link:hover { text-decoration: underline; }
+    .v-link-muted {
+      color: var(--color-muted-foreground);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .v-link-muted:hover { color: var(--color-foreground); }
+
+    /* Token-based border radius */
+    .rounded-token { border-radius: var(--radius, 0.5rem); }
+    .rounded-token-sm { border-radius: calc(var(--radius, 0.5rem) - 4px); }
+    .rounded-token-md { border-radius: calc(var(--radius, 0.5rem) - 2px); }
+    .rounded-token-lg { border-radius: var(--radius, 0.5rem); }
+
+    /* Scroll-snap carousel */
+    .v-carousel {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      gap: 0.5rem;
+    }
+    .v-carousel::-webkit-scrollbar { display: none; }
+    .v-carousel-item {
+      flex: 0 0 100%;
+      scroll-snap-align: start;
+      border-radius: 0.5rem;
+      background-color: var(--color-surface-1);
+    }
+
+    /* Button base */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+    }
+    .btn-sm {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.8125rem;
+    }
+    .btn-lg, .btn-large {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+    }
+    .btn-block {
+      display: flex;
+      width: 100%;
+    }
+
+    /* Button variants */
+    .btn-primary {
+      background-color: var(--color-primary);
+      color: var(--color-primary-foreground);
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 40%, transparent);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background-color: var(--color-secondary);
+      color: var(--color-secondary-foreground);
+      border: 1px solid var(--color-border);
+    }
+    .btn-secondary:hover {
+      background-color: var(--color-surface-2);
+      border-color: var(--color-primary);
+    }
+    .btn-secondary:active { background-color: var(--color-surface-3); }
+
+    .btn-destructive {
+      background-color: var(--color-destructive);
+      color: var(--color-destructive-foreground);
+    }
+    .btn-destructive:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background-color: transparent;
+      color: var(--color-foreground);
+    }
+    .btn-ghost:hover { background-color: var(--color-secondary); }
+
+    .btn-link {
+      background-color: transparent;
+      color: var(--color-primary);
+      padding: 0;
+    }
+    .btn-link:hover { text-decoration: underline; }
+
+    .btn-destructive-outline {
+      background-color: transparent;
+      color: var(--color-destructive);
+      border: 1px solid color-mix(in srgb, var(--color-destructive) 50%, transparent);
+    }
+    .btn-destructive-outline:hover {
+      background-color: color-mix(in srgb, var(--color-destructive) 8%, transparent);
+      border-color: color-mix(in srgb, var(--color-destructive) 70%, transparent);
+    }
+    .btn-destructive-outline:active { background-color: color-mix(in srgb, var(--color-destructive) 12%, transparent); }
+
+    /* Divider */
+    .v-divider { border-color: color-mix(in srgb, var(--color-surface-3) 10%, transparent); }
+
+    /* Responsive page heading */
+    .v-page-heading {
+      font-size: 1.875rem;
+      line-height: 2.25rem;
+      font-weight: 600;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 768px) {
+      .v-page-heading {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+        margin-bottom: 1.25rem;
+      }
+    }
+
+    /* User avatar */
+    .user-avatar-initials {
+      background-color: var(--color-primary);
+      color: var(--color-primary-foreground);
+    }
+    .user-avatar-name { color: var(--color-foreground); }
+</style>
+
+<%# CDN mode: @tailwindcss/browser needs the @theme inline block to generate utilities.
+    In build mode, Tailwind CLI reads vibes_theme.css directly — this block is not needed.
+    Auto-included from vibes_theme.css so they can never fall out of sync. %>
+<% if ENV["USE_MOUNTED_VIBES"] == "true" %>
+<style type="text/tailwindcss"<%= safe_nonce_attr %>>
+<%= File.read(File.join(Rails.root, 'app', 'assets', 'tailwind', 'vibes_theme.css')).html_safe %>
+</style>
+<% end %>

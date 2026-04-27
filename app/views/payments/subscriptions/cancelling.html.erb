@@ -1,0 +1,41 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <!-- Main content -->
+  <main class="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-12 lg:py-6">
+    <div class="max-w-2xl">
+      <!-- Breadcrumb -->
+      <div class="flex items-center gap-2 mb-3">
+        <%= link_to "Billing Plan", payments_path, class: "v-link-muted text-sm" %>
+        <%= chevron_right_icon(class: "w-4 h-4 text-muted-foreground") %>
+        <span class="text-sm text-muted-foreground"><%= t ".title" %></span>
+      </div>
+
+      <h1 class="v-page-heading text-foreground mb-6">Cancel Subscription</h1>
+
+      <!-- Subscription Summary -->
+      <div class="mb-6">
+        <div class="text-lg font-semibold text-foreground mb-1"><%= @subscription.plan&.name || @subscription.name %></div>
+        <% unless @subscription.plan.nil? %>
+          <div class="text-base text-foreground mb-4">
+            <%= pay_amount_to_currency(@subscription) %> / <%= plan_interval(@subscription.plan) %>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Warning Message -->
+      <div class="space-y-3 mb-8 text-muted-foreground">
+        <p>We're sorry to see you go! Your subscription will remain active until the end of your current billing period.</p>
+        <p>You'll continue to have access to all features until then, and you can reactivate anytime.</p>
+        <p>Need help? <a href="mailto:<%= RubyOnVibes.config.support_email %>" class="v-link">Contact our support team</a>.</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center pt-6 border-t border-border">
+        <%= link_to "Back", payments_path, class: "btn btn-secondary w-full sm:w-auto" %>
+
+        <%= button_to "Cancel Subscription", cancel_payments_subscription_path(@subscription), method: :delete, class: "btn btn-destructive w-full sm:w-auto", data: { turbo_confirm: "Are you sure you want to cancel your subscription?" } %>
+      </div>
+    </div>
+  </main>
+</div>

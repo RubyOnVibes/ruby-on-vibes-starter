@@ -1,0 +1,51 @@
+# Render.com deployment config - SQLite with Persistent Disk
+# See docs/render.md for setup instructions
+
+services:
+  - type: web
+    runtime: docker
+    name: REPLACE_ME  # set to your Render service name
+    plan: standard
+    region: oregon
+    
+    # Build from Dockerfile (no buildCommand needed)
+    dockerfilePath: ./Dockerfile
+    
+    # Initialize databases before starting server
+    preDeployCommand: bundle exec rails db:migrate
+    
+    # Persistent disk for SQLite databases
+    disk:
+      name: app-data
+      mountPath: /mnt/data
+      sizeGB: 10
+    
+    # Health check endpoint
+    healthCheckPath: /up
+    
+    # Environment variables
+    envVars:
+      # Persistent disk path (databases, uploads, etc)
+      - key: RENDER_DISK_PATH
+        value: /mnt/data
+      
+      # Rails secrets
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      
+      - key: RAILS_ENV
+        value: production
+      
+      - key: RAILS_SERVE_STATIC_FILES
+        value: true
+      
+      - key: RAILS_LOG_TO_STDOUT
+        value: true
+      
+      # Optional: Email delivery (add your SMTP settings)
+      # - key: SMTP_ADDRESS
+      #   value: smtp.sendgrid.net
+      # - key: SMTP_USERNAME
+      #   sync: false
+      # - key: SMTP_PASSWORD
+      #   sync: false

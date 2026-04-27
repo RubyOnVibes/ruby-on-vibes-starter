@@ -1,0 +1,14 @@
+alice_personal_chat_owner:
+  chat: alice_personal_chat
+  member: alice_personal_member
+  role: 0
+
+alice_team_chat_owner:
+  chat: team_chat
+  member: alice_team_member
+  role: 0
+
+bob_team_chat_member:
+  chat: team_chat
+  member: bob_team_member
+  role: 1

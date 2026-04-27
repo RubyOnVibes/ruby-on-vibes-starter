@@ -1,0 +1,68 @@
+<style nonce="<%= content_security_policy_nonce %>">
+    /* Devise canvas scoped variables */
+    .devise-canvas { --devise-border: var(--color-input); }
+    .devise-canvas h1, .devise-canvas h2 { font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
+    .devise-canvas h1 { font-size: clamp(1.5rem, 2.2vw + 1rem, 2rem); }
+    .devise-canvas h2 { font-size: clamp(1.25rem, 1.8vw + 0.9rem, 1.5rem); }
+
+    /* Form labels + fields */
+    .devise-canvas label {
+        display: block;
+        margin-top: 0.75rem;
+        font-weight: 600;
+        color: var(--color-foreground);
+        letter-spacing: -0.01em;
+    }
+    .devise-canvas input[type="email"],
+    .devise-canvas input[type="password"],
+    .devise-canvas input[type="text"],
+    .devise-canvas input[type="tel"],
+    .devise-canvas input[type="url"] {
+        width: 100%;
+        margin-top: 0.75rem;
+        border: 1px solid var(--devise-border);
+        border-radius: 3rem;
+        padding: 0.5rem 0.75rem;
+        background-color: var(--color-background);
+        color: var(--color-foreground);
+        caret-color: var(--color-primary);
+    }
+    .devise-canvas input:focus {
+        outline: none;
+        border-color: var(--input-focus);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--input-focus) 35%, transparent);
+    }
+    /* Primary actions */
+    .devise-canvas button[type="submit"],
+    .devise-canvas input[type="submit"],
+    .devise-canvas .btn-primary {
+        appearance: none;
+        background-color: var(--color-primary);
+        color: var(--color-primary-foreground);
+        border: 0;
+        width: 100%;
+        border-radius: 3rem;
+        padding: 0.625rem 1.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 0.75rem;
+    }
+    .devise-canvas button[type="submit"]:hover,
+    .devise-canvas input[type="submit"]:hover,
+    .devise-canvas .btn-primary:hover {
+        background-color: color-mix(in srgb, var(--color-primary) 92%, transparent);
+    }
+    .devise-canvas button[type="submit"]:focus,
+    .devise-canvas input[type="submit"]:focus,
+    .devise-canvas .btn-primary:focus {
+        outline: 2px solid var(--color-border);
+        outline-offset: 2px;
+    }
+
+    /* Link buttons in Devise links container: match input border tone */
+    .devise-canvas #devise-links a {
+        border-color: var(--devise-border);
+        border-radius: 3rem;
+    }
+</style>

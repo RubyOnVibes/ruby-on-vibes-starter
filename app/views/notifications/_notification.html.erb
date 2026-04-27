@@ -1,0 +1,22 @@
+<%# Notification Partial for Turbo Streams %>
+<%# Hidden div with JSON data for MutationObserver hydration %>
+
+<div
+  id="notification-<%= notification.id %>"
+  data-notification="<%= {
+    id: notification.id,
+    type: notification.type,
+    message: notification.message,
+    title: notification.try(:title),
+    url: notification.url,
+    icon: notification.try(:icon),
+    iconColor: notification.try(:icon_color),
+    actionLabel: notification.try(:action_label),
+    actionUrl: notification.try(:action_url),
+    readAt: notification.read_at&.iso8601,
+    seenAt: notification.seen_at&.iso8601,
+    createdAt: notification.created_at.iso8601,
+    updatedAt: notification.updated_at.iso8601
+  }.to_json %>"
+>
+</div>

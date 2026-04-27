@@ -1,0 +1,2 @@
+import{R as c,K as n,Q as x}from"./islands-DqLo2xWQ.js";import{r,j as d}from"./client-DLdtn3m_.js";var j=({code:o,language:e,raw:a,className:i,...m})=>{let{shikiTheme:l}=r.useContext(c),s=n(),[u,t]=r.useState(a);return r.useEffect(()=>{if(!s){t(a);return}let g=s.highlight({code:o,language:e,themes:l},h=>{t(h)});g&&t(g)},[o,e,l,s,a]),d.jsx(x,{className:i,language:e,result:u,...m})};export{j as HighlightedCodeBlockBody};
+//# sourceMappingURL=highlighted-body-B3W2YXNL-BIkC5War.js.map

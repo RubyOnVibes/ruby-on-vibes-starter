@@ -1,0 +1,44 @@
+free:
+  name: Free
+  amount: 0
+  currency: usd
+  interval: month
+  trial_period_days: 0
+  hidden: true
+  charge_per_unit: false
+  metadata: {}
+
+starter_monthly:
+  name: Starter
+  amount: 999
+  currency: usd
+  interval: month
+  trial_period_days: 14
+  hidden: false
+  charge_per_unit: false
+  metadata:
+    features:
+      - "5 team members"
+      - "10GB storage"
+
+starter_yearly:
+  name: Starter
+  amount: 9999
+  currency: usd
+  interval: year
+  trial_period_days: 14
+  hidden: false
+  charge_per_unit: false
+  metadata: {}
+
+pro_monthly:
+  name: Pro
+  amount: 2999
+  currency: usd
+  interval: month
+  trial_period_days: 14
+  hidden: false
+  charge_per_unit: true
+  unit_label: seat
+  metadata:
+    stripe_tax: true

@@ -1,0 +1,278 @@
+<%# Chat Invitation Show Page - Same Layout as Chat Pages %>
+<% content_for(:title, 'Chat Invitation') %>
+
+<%# CRITICAL: Disable scroll on body for chat pages %>
+<% content_for :body_class, 'overflow-hidden' %>
+<% @sticky_nav_footer = true %>
+
+<%# Reuse chat page styling %>
+<style nonce="<%= content_security_policy_nonce %>">
+  .chat-sidebar-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .chat-sidebar-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .chat-sidebar-list::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-border) 40%, transparent);
+    border-radius: 3px;
+  }
+  
+  .chat-sidebar-list::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+  
+  .chat-sidebar-list {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-border) 40%, transparent) transparent;
+    overflow-x: visible !important;
+    padding-right: 2px;
+  }
+  
+  .chat-sidebar {
+    background-color: var(--color-surface-0);
+  }
+
+  /* Mobile: Solid background with shadow */
+  @media (max-width: 1023px) {
+    .chat-sidebar {
+      background-color: var(--color-background);
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    }
+    
+    .chat-sidebar-list {
+      overflow: visible !important;
+    }
+  }
+  
+  /* Desktop: Subtle background with border */
+  @media (min-width: 1024px) {
+    .chat-sidebar {
+      box-shadow: none;
+      border-right: 1px solid var(--color-border);
+    }
+  }
+  
+  .chat-list-item { color: var(--color-muted-foreground); }
+  .chat-list-item:not(.active):hover { background-color: var(--color-surface-1); color: var(--color-foreground); }
+  .chat-list-item.active { background-color: var(--color-surface-2); color: var(--color-foreground); font-weight: 500; }
+  .new-chat-btn { background-color: transparent; color: var(--color-foreground); border: none; }
+  .new-chat-btn:hover { background-color: var(--color-surface-1); }
+  .mobile-sidebar-toggle { background-color: transparent; color: var(--color-muted-foreground); }
+  .mobile-sidebar-toggle:hover { background-color: var(--color-surface-1); color: var(--color-foreground); }
+  
+  .mobile-sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  html.dark .mobile-sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+  
+  .chat-sidebar-mobile {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-100%);
+  }
+  
+  .chat-sidebar-mobile.show-mobile {
+    transform: translateX(0);
+  }
+  
+  @media (max-width: 1023px) {
+    [data-sidebar] {
+      display: flex !important;
+      position: fixed !important;
+    }
+    [data-sidebar]:not(.show-mobile) {
+      transform: translateX(-100%);
+      pointer-events: none;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    [data-sidebar] {
+      display: flex !important;
+      position: relative !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      transform: none !important;
+    }
+  }
+  
+  .chat-user-avatar { background-color: var(--color-primary); color: var(--color-primary-foreground); }
+  .chat-user-name { color: var(--color-foreground); }
+  .chat-sidebar-footer { border-color: var(--color-border); }
+  .chat-ws-name { color: var(--color-muted-foreground); font-size: 0.75rem; }
+  
+  /* Desktop: hardcoded navbar subtraction (stable, no dynamic browser chrome) */
+  #chat-container-wrapper {
+    height: calc(100vh - 72px);
+    max-height: calc(100vh - 72px);
+    overflow: hidden;
+  }
+
+  /* Mobile: flexbox fills remaining space — no hardcoded pixel subtraction needed.
+     Body is flex column at 100dvh, navbar takes natural height, main gets the rest. */
+  @media (max-width: 1023px) {
+    body.overflow-hidden {
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.overflow-hidden main {
+      flex: 1;
+      min-height: 0 !important; /* Override Tailwind min-h-screen */
+    }
+
+    #chat-container-wrapper {
+      height: 100%;
+      max-height: 100%;
+    }
+
+    #mobile-sidebar {
+      top: 0 !important;
+      height: 100dvh !important;
+      padding-top: 0;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    #mobile-sidebar {
+      height: 100% !important;
+      padding-top: 0;
+      top: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+    }
+  }
+
+  .chat-sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.overflow-hidden {
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  body.overflow-hidden main {
+    overflow: hidden;
+  }
+</style>
+
+<%# Full-screen container with sidebar %>
+<div id="chat-container-wrapper" class="w-full flex overflow-hidden" style="background-color: var(--color-background); border-top: 1px solid var(--color-border);">
+  <div id="mobile-sidebar-overlay" class="mobile-sidebar-overlay fixed inset-0 z-40 hidden opacity-0" onclick="closeChatSidebar()" ontouchstart="closeChatSidebar()"></div>
+  
+  <script nonce="<%= content_security_policy_nonce %>">
+    function closeChatSidebar(event) {
+      // Only close on mobile
+      if (window.innerWidth >= 1024) return;
+      
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar) sidebar.classList.remove('show-mobile');
+      if (overlay) {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+  </script>
+  
+  <%= render "shared/turbo_script" do %>
+    const buttons = document.querySelectorAll('.mobile-sidebar-toggle');
+    if (!buttons.length) return;
+    
+    function openSidebar() {
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar && overlay) {
+        sidebar.classList.add('show-mobile');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.add('opacity-100'), 10);
+      }
+    }
+    
+    buttons.forEach(button => button.addEventListener('click', openSidebar));
+    
+    return () => {
+      buttons.forEach(button => button.removeEventListener('click', openSidebar));
+    };
+  <% end %>
+  
+  <%= render "chats/chat_sidebar", active_chat_id: nil, active_invitation_id: @chat_invitation&.id, nonce: content_security_policy_nonce %>
+  
+  <%# Main area - Invitation details %>
+  <div class="flex-1 flex flex-col min-w-0 w-full" style="background-color: var(--color-background)">
+    <div class="flex-1 flex items-center justify-center p-4 sm:p-6">
+      <div class="max-w-lg w-full">
+        <%# Invitation card - minimal ChatGPT style %>
+        <div class="text-center">
+          <%# Icon %>
+          <div class="mb-6">
+            <div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center" style="background-color: color-mix(in srgb, var(--color-primary) 10%, transparent)">
+              <svg class="w-10 h-10" style="color: var(--color-primary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+              </svg>
+            </div>
+          </div>
+          
+          <%# Title %>
+          <h1 class="text-2xl font-semibold mb-2" style="color: var(--color-foreground)">
+            <%= @inviter.user.name.split.first %> invited you to join
+          </h1>
+          
+          <%# Chat name %>
+          <p class="text-lg mb-6" style="color: var(--color-muted-foreground)">
+            "<%= @chat.name %>"
+          </p>
+          
+          <%# Info row %>
+          <div class="flex items-center justify-center gap-6 mb-8 text-sm" style="color: var(--color-muted-foreground)">
+            <div class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+              </svg>
+              <span><%= @chat.messages.count %></span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+              </svg>
+              <span><%= @chat.chat_members.count %></span>
+            </div>
+          </div>
+          
+          <%# Actions - ChatGPT style %>
+          <div class="flex flex-col gap-3 max-w-sm mx-auto">
+            <%= button_to accept_chat_invitation_path(@chat_invitation), 
+                method: :post, 
+                class: 'w-full py-3 px-4 rounded-lg font-medium text-sm transition',
+                style: 'background-color: var(--color-primary); color: var(--color-primary-foreground)' do %>
+              Join group chat
+            <% end %>
+            <%= button_to ignore_chat_invitation_path(@chat_invitation), 
+                method: :post, 
+                class: 'w-full py-3 px-4 rounded-lg font-medium text-sm transition',
+                style: 'background-color: transparent; color: var(--color-muted-foreground)' do %>
+              Ignore
+            <% end %>
+          </div>
+          
+          <%# Note %>
+          <p class="text-xs mt-6" style="color: var(--color-muted-foreground)">
+            Only this conversation will be shared. Your personal chats are always private.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

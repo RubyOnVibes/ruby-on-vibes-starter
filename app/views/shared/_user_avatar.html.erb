@@ -1,0 +1,44 @@
+<%# Shared user avatar with initials fallback %>
+<%# Usage: render "shared/user_avatar", user: current_user, size: "sm", link: true %>
+<%# Sizes: xs (24px), sm (32px), md (40px), lg (48px) %>
+<% user = local_assigns[:user] || current_user %>
+<% size = local_assigns[:size] || "sm" %>
+<% link = local_assigns.fetch(:link, true) %>
+<% show_name = local_assigns.fetch(:show_name, false) %>
+
+<% size_classes = {
+  "xs" => "w-6 h-6 text-[10px]",
+  "sm" => "w-8 h-8 text-xs",
+  "md" => "w-10 h-10 text-sm",
+  "lg" => "w-12 h-12 text-base"
+} %>
+
+<% avatar_content = capture do %>
+  <% if user.avatar.attached? && user.avatar.variable? %>
+    <%= image_tag avatar_url(user, size: 64), 
+        class: "#{size_classes[size]} rounded-full object-cover",
+        alt: user.name %>
+  <% else %>
+    <span class="user-avatar-initials <%= size_classes[size] %> rounded-full flex items-center justify-center font-semibold">
+      <%= user.first_name&.first&.upcase || user.email&.first&.upcase || "?" %>
+    </span>
+  <% end %>
+<% end %>
+
+<% if link %>
+  <a href="<%= edit_profile_registration_path %>" 
+     class="user-avatar-link flex items-center gap-2 hover:opacity-80 transition"
+     title="<%= user.name %>">
+    <%= avatar_content %>
+    <% if show_name %>
+      <span class="user-avatar-name text-sm font-medium truncate max-w-[120px]"><%= user.name %></span>
+    <% end %>
+  </a>
+<% else %>
+  <div class="flex items-center gap-2">
+    <%= avatar_content %>
+    <% if show_name %>
+      <span class="user-avatar-name text-sm font-medium truncate max-w-[120px]"><%= user.name %></span>
+    <% end %>
+  </div>
+<% end %>

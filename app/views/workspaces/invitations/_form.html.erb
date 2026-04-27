@@ -1,0 +1,52 @@
+<%= form_with(model: [@workspace, invitation], url: workspace_invitations_path(@workspace)) do |form| %>
+  <%= render "error_messages", resource: form.object %>
+
+  <!-- Contact -->
+  <div class="mb-10">
+    <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Contact</h2>
+    
+    <div class="space-y-5">
+      <div>
+        <%= form.label :name, "Name", class: "block text-sm font-medium text-foreground mb-2" %>
+        <%= form.text_field :name, 
+            autofocus: true,
+            class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-shadow" %>
+      </div>
+
+      <div>
+        <%= form.label :email, class: "block text-sm font-medium text-foreground mb-2" %>
+        <%= form.email_field :email, 
+            class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-shadow" %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Roles -->
+  <div class="mb-10">
+    <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Roles</h2>
+    
+    <div class="space-y-4">
+      <% Member::ROLES.each do |role| %>
+        <label class="flex items-start gap-3 cursor-pointer">
+          <%= form.check_box role, class: "mt-1 w-4 h-4 rounded border-input dark:border-border text-primary focus:ring-ring focus:ring-offset-0" %>
+          <div>
+            <span class="block font-medium text-foreground"><%= role.to_s.titleize %></span>
+            <span class="block text-sm text-muted-foreground leading-relaxed">
+              <% if role == :admin %>
+                Manage workspace settings, billing, and members
+              <% elsif role == :member %>
+                Access workspace resources
+              <% end %>
+            </span>
+          </div>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center gap-4 pt-8 border-t border-border">
+    <%= form.submit "Send invite", class: "btn btn-sm btn-primary" %>
+    <%= link_to "Cancel", @workspace, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" %>
+  </div>
+<% end %>

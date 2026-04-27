@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title inertia><%= content_for(:title) || "Ruby On Vibes Template" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%# Prevent white flash on dark mode - runs before page render %>
+    <script<%= safe_nonce_attr %>>
+      (function() {
+        // Default to light mode for new users - only dark if explicitly set
+        const stored = localStorage.getItem('theme');
+        if (stored === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
+    <%= yield :head %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
+    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%= render "vibes_javascript_utils" %>
+    <%= render "devise/shared/styles" if devise_canvas? %>
+    <%= render "shared/vibes_iframe_bridge" if ENV['USE_MOUNTED_VIBES'] == 'true' %>
+
+    <%# Defensive: give unsized SVGs a sane default before Tailwind CSS loads (prevents giant SVGs in CDN mode) %>
+    <style<%= safe_nonce_attr %>>
+      @layer svg-safety {
+        svg:not([width]):not([height]) { width: 1em; height: 1em; }
+      }
+    </style>
+
+    <% if ENV['USE_MOUNTED_VIBES'] == 'true' %>
+      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.13"></script>
+    <% elsif ENV['USE_VITE_STYLESHEET'] == 'true' %>
+      <%# Only use vite stylesheet if explicitly enabled - we use a singular source of truth for styles by default %>
+      <%= vite_stylesheet_tag "application" %>
+    <% else %>
+      <%# Includes all stylesheet files in app/assets/stylesheets %>
+      <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <% end %>
+
+    <%= vite_react_refresh_tag %>
+    <%= vite_client_tag %>
+    <%= vite_javascript_tag "inertia" %>    
+    <%= inertia_ssr_head %>
+    <%= vite_javascript_tag 'application' if false %>
+
+    <%= render "vibes_theme" %>
+  </head>
+
+  <body class="antialiased bg-background text-foreground" data-turbo="false" data-user="<%= user_data_attrs %>" data-app="<%= app_data_attrs %>">
+    <%= render "shared/impersonation_banner" %>
+
+    <%# Inertia automatically includes ToasterProvider which handles flash messages %>
+
+    <main class="w-full min-h-screen">
+      <%= yield %>
+    </main>
+  </body>
+</html>

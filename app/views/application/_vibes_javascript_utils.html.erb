@@ -1,0 +1,42 @@
+<script>
+  window.Auth = {
+    user: () => {
+      try {
+        const raw = document.body?.dataset?.user;
+        if (!raw) return undefined;
+        return JSON.parse(raw);
+      } catch (_) {
+        return undefined;
+      }
+    },
+
+    isAuthenticated: () => {
+      const u = window.Auth.user();
+      return Boolean(u && (u.id || u.email));
+    }
+  }
+
+  window.App = {
+    data: () => {
+      try {
+        const raw = document.body?.dataset?.app;
+        if (!raw) return undefined;
+        return JSON.parse(raw);
+      } catch (_) {
+        return undefined;
+      }
+    }
+  }
+
+  window.Notifications = {
+    data: () => {
+      try {
+        const raw = document.body?.dataset?.notifications;
+        if (!raw) return { count: 0, url: '/notifications' };
+        return JSON.parse(raw);
+      } catch (_) {
+        return { count: 0, url: '/notifications' };
+      }
+    }
+  }
+</script>

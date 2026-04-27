@@ -1,0 +1,39 @@
+<%# Message Partial - Rendered by Turbo Streams %>
+<%# React's MutationObserver reads from this via useTurboChat adapter %>
+<%# Defense: Skip rendering user messages that aren't user_submitted (ruby_llm duplicates) %>
+<% return if message.role == 'user' && !message.user_submitted? %>
+
+<div 
+  id="message-<%= message.id %>"
+  data-message='<%= {
+    id: message.id,
+    role: message.role,
+    content: message.content.to_s,
+    user_submitted: message.user_submitted?,
+    tool_call_name: message.parent_tool_call&.name,
+    mentions: message.mentions.map { |m|
+      {
+        id: m.mentionable_param,
+        model: m.mentionable_type,
+        label: m.label, # Always fresh from mentionable.mentionable_label
+        path: m.mentionable&.mentionable_path
+      }
+    },
+    attachments: message.serialize_attachments,
+    metadata: message.metadata || {},
+    user: message.serialize_user,
+    created_at: message.created_at&.iso8601,
+    updated_at: message.updated_at&.iso8601
+  }.to_json %>'
+  class="message"
+  data-role="<%= message.role %>"
+>
+  <%# Content element - watched by MutationObserver for streaming updates %>
+  <div
+    id="message_<%= message.id %>_content"
+    data-raw-content="<%= message.content.to_s %>"
+    class="message-content"
+  >
+    <%# Content rendered here - React will read from data-raw-content %>
+  </div>
+</div>

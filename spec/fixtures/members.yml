@@ -1,0 +1,23 @@
+alice_personal_member:
+  user: alice
+  workspace: alice_personal
+  admin: true
+  roles: '{"admin": true}'
+
+bob_personal_member:
+  user: bob
+  workspace: bob_personal
+  admin: true
+  roles: '{"admin": true}'
+
+alice_team_member:
+  user: alice
+  workspace: team_org
+  admin: true
+  roles: '{"admin": true}'
+
+bob_team_member:
+  user: bob
+  workspace: team_org
+  admin: false
+  roles: '{"admin": false}'

@@ -1,0 +1,7 @@
+css: bin/rails tailwindcss:watch
+vite: bin/vite dev
+islands: yarn watch:islands
+ssr: bin/vite ssr
+web: OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES bin/rails server -p 3001
+worker: bin/jobs
+stripe: stripe listen --forward-to localhost:3001/webhooks/stripe

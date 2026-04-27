@@ -1,0 +1,14 @@
+<%# ChatRun State Partial - Broadcast to chat stream %>
+<%# Frontend reads this to determine if stop button should show %>
+<div 
+  id="chat-run-state"
+  data-chat-run='<%= {
+    id: chat_run.id,
+    status: chat_run.status,
+    isActive: chat_run.active?,
+    createdAt: chat_run.created_at&.iso8601
+  }.to_json %>'
+  style="display: none;"
+  aria-hidden="true"
+></div>
+

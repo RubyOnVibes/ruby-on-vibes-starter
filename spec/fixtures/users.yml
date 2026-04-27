@@ -1,0 +1,35 @@
+alice:
+  email: alice@example.com
+  encrypted_password: <%= Devise::Encryptor.digest(User, 'password123') %>
+  first_name: Alice
+  last_name: Smith
+  username: alice_test
+  admin: false
+  sign_in_count: 0
+  failed_attempts: 0
+  gravatar_url: ""
+  time_zone: UTC
+
+bob:
+  email: bob@example.com
+  encrypted_password: <%= Devise::Encryptor.digest(User, 'password123') %>
+  first_name: Bob
+  last_name: Jones
+  username: bob_test
+  admin: false
+  sign_in_count: 0
+  failed_attempts: 0
+  gravatar_url: ""
+  time_zone: UTC
+
+admin:
+  email: admin@example.com
+  encrypted_password: <%= Devise::Encryptor.digest(User, 'password123') %>
+  first_name: Admin
+  last_name: User
+  username: admin_user
+  admin: true
+  sign_in_count: 0
+  failed_attempts: 0
+  gravatar_url: ""
+  time_zone: UTC

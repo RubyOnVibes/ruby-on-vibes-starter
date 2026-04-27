@@ -1,0 +1,40 @@
+<%#
+  ERB Homepage - Blank Canvas for AI Customization
+
+  This file starts minimal so the AI CREATES a fresh design based on the user's idea.
+  The navbar is already rendered by the layout - this is just the main content area.
+
+  AI INSTRUCTIONS:
+  - Create a complete, beautiful landing page from scratch
+  - Design should be specifically tailored to the user's product idea — not a generic template
+  - Use Tailwind CSS classes for styling (Alpine.js is available if user requests interactivity)
+  - Use inline SVGs for icons
+  - Use ERB helpers: link_to, user_signed_in?, RubyOnVibes.application_name
+  - Modern, polished, and intentional — choose sections that fit THIS product
+%>
+
+<% content_for :title do %>
+  <%= RubyOnVibes.application_name %>
+<% end %>
+
+<div class="min-h-[calc(100vh-64px)] flex flex-col bg-background">
+  <!-- AI: Create your landing page here — this is a blank canvas -->
+  <!-- Design something stunning, modern, and specifically tailored to the user's product -->
+  <!-- Choose sections that fit THIS product, not a one-size-fits-all template -->
+
+  <section class="flex-1 flex items-center justify-center px-6 py-24">
+    <div class="text-center">
+      <h1 class="text-4xl font-bold text-foreground mb-4">
+        <%= RubyOnVibes.application_name %>
+      </h1>
+      <p class="text-muted-foreground mb-8">
+        Your app is ready. Customize this page to match your vision.
+      </p>
+      <% if user_signed_in? %>
+        <%= link_to "Go to Dashboard", dashboard_path, class: "btn btn-primary" %>
+      <% else %>
+        <%= link_to "Get Started", new_user_registration_path, class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </section>
+</div>

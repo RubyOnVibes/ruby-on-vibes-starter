@@ -1,0 +1,25 @@
+# Messages for testing
+# Note: member_id must match the user's membership in the chat's workspace
+
+alice_message:
+  chat: alice_personal_chat
+  role: user
+  content: "Hello from Alice"
+  user: alice
+  member: alice_personal_member
+  user_submitted: true
+
+bob_message:
+  chat: team_chat
+  role: user
+  content: "Hello from Bob"
+  user: bob
+  member: bob_team_member
+  user_submitted: true
+
+assistant_response:
+  chat: alice_personal_chat
+  role: assistant
+  content: "Hi Alice! How can I help?"
+  user_submitted: false
+

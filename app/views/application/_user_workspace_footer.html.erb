@@ -1,0 +1,53 @@
+<div class="user-workspace-footer p-3" style="border-top: 1px solid var(--color-border);">
+  <div class="flex items-center gap-2">
+    <% if current_user.avatar.attached? && current_user.avatar.variable? %>
+      <a href="<%= edit_profile_registration_path %>" 
+         class="flex-shrink-0 hover:opacity-90 transition"
+         onclick="closeMobileSidebar(event)">
+        <%= image_tag avatar_url(current_user, size: 64), 
+            class: "w-8 h-8 rounded-full object-cover",
+            alt: current_user.name %>
+      </a>
+    <% else %>
+      <a href="<%= edit_profile_registration_path %>" 
+         class="user-avatar-initials w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold hover:opacity-90 transition flex-shrink-0"
+         onclick="closeMobileSidebar(event)">
+        <%= current_user.first_name&.first&.upcase || current_user.email&.first&.upcase || "?" %>
+      </a>
+    <% end %>
+    <div class="flex-1 min-w-0">
+      <a href="<%= edit_profile_registration_path %>" 
+         class="user-ws-name text-sm font-medium hover:opacity-80 transition block truncate"
+         onclick="closeMobileSidebar(event)">
+        <%= current_user.name %>
+      </a>
+      <a href="<%= RubyOnVibes.show_workspaces? ? workspace_path(Current.workspace) : root_path %>"
+         class="user-ws-wsname text-xs hover:opacity-80 transition block truncate mt-0.5"
+         onclick="closeMobileSidebar(event)">
+        <%= RubyOnVibes.show_workspaces? ? Current.workspace.name : RubyOnVibes.application_name %>
+      </a>
+    </div>
+  </div>
+</div>
+
+<script nonce="<%= local_assigns[:nonce] %>">
+  function closeMobileSidebar(event) {
+    // Only close on mobile (< 1024px)
+    if (window.innerWidth < 1024) {
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar) sidebar.classList.remove('show-mobile');
+      if (overlay) {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+  }
+</script>
+
+<style>
+  .user-workspace-footer { background-color: var(--color-surface-0); }
+  .user-ws-name { color: var(--color-foreground); }
+  .user-ws-wsname { color: var(--color-muted-foreground); font-size: 0.7rem; }
+</style>

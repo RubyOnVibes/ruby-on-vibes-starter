@@ -1,0 +1,99 @@
+<div class="sm:flex flex-wrap items-center justify-center">
+  <!-- Interval Toggle -->
+  <% if available_intervals.length > 1 %>
+    <div class="relative self-center mb-12 bg-surface-2 rounded-full p-1 flex">
+      <% available_intervals.each do |interval| %>
+        <% interval_label = interval == 'month' ? 'Monthly' : 'Yearly' %>
+        <% is_active = interval == active_interval %>
+        <a
+          href="<%= pricing_path(interval: interval) %>"
+          data-turbo-action="replace"
+          class="relative px-8 py-3 text-sm font-semibold whitespace-nowrap rounded-full focus:outline-hidden focus:z-10 transition-all duration-200 <%= is_active ? 'shadow-sm text-foreground bg-surface-0 border-border border hover:text-foreground' : 'text-muted-foreground hover:text-foreground' %>"
+        >
+          <%= interval_label %>
+        </a>
+      <% end %>
+    </div>
+  <% end %>
+
+  <!-- Plans Container -->
+  <div class="w-full">
+    <div class="flex flex-wrap items-stretch justify-center -mx-4">
+      <% current_plans = grouped_plans[active_interval] || [] %>
+      <% current_plans.each do |plan| %>
+        <div class="lg:w-1/3 w-full p-10 bg-card border-card border hover:border-primary m-4 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+          <!-- Plan Name -->
+          <h4 class="mb-8 text-2xl font-semibold tracking-tight text-foreground">
+            <%= plan[:name] %>
+          </h4>
+
+          <!-- Price -->
+          <div class="mb-8 pb-8 border-b border-border">
+            <% if plan[:contact_url].present? %>
+              <span class="text-5xl font-bold tracking-tight text-foreground">
+                Contact Us
+              </span>
+            <% else %>
+              <div class="flex items-baseline gap-2">
+                <span class="text-5xl font-bold tracking-tight text-foreground">
+                  <%= number_to_currency(plan[:amount] / 100.0, unit: plan[:currency].upcase == 'USD' ? '$' : plan[:currency].upcase, precision: plan[:amount] % 100 == 0 ? 0 : 2) %>
+                </span>
+                <span class="text-lg text-muted-foreground font-medium">
+                  <% if plan[:unit_label].present? %>
+                    / <%= plan[:unit_label] %> 
+                  <% end %>/ <%= plan[:interval_count] > 1 ? "#{plan[:interval_count]} #{plan[:interval]}s" : plan[:interval] %>
+                </span>
+              </div>
+            <% end %>
+          </div>
+
+          <!-- Description -->
+          <% if plan[:description].present? %>
+            <p class="mb-8 text-base leading-relaxed text-muted-foreground">
+              <%= plan[:description] %>
+            </p>
+          <% end %>
+
+          <!-- Features -->
+          <div class="mb-10 space-y-4">
+            <% (plan[:features] || []).each do |feature| %>
+              <div class="flex items-start gap-3 text-foreground">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="shrink-0 mt-0.5 text-primary h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <div class="text-base"><%= feature %></div>
+              </div>
+            <% end %>
+          </div>
+
+          <!-- CTA Button -->
+          <% if plan[:contact_url].present? %>
+            <a
+              href="<%= plan[:contact_url] %>"
+              class="btn btn-secondary btn-large btn-block"
+            >
+              Contact Us
+            </a>
+          <% else %>
+            <a
+              href="<%= plan[:checkout_path] %>"
+              class="btn btn-secondary btn-large btn-block"
+            >
+              <%= plan[:trial_period] ? 'Start Free Trial' : 'Get Started' %>
+            </a>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+

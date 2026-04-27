@@ -1,0 +1,12 @@
+<%= RubyOnVibes.application_name %>
+
+<%= yield %>
+
+© <%= Time.current.year %> <%= RubyOnVibes.business_name %>
+<% if RubyOnVibes.business_address.present? %>
+<%= RubyOnVibes.business_address %>
+<% end %>
+<% if RubyOnVibes.support_email.present? %>
+<%= RubyOnVibes.support_email %>
+<% end %>
+

@@ -1,0 +1,401 @@
+#!/usr/bin/env bash
+# Multi-process server: web (Falcon) + SolidQueue worker + SSR server
+# Adapts to deployment environment:
+#
+# 1. Fly vibecoding (USE_MOUNTED_VIBES=true):
+#    - Falcon + SolidQueue + SSR (all in one container)
+#    - Hot reloads, platform integrations
+#
+# 2. Render SQLite (RENDER_DISK_PATH set):
+#    - Falcon + SolidQueue + SSR server (single node, can't scale horizontally)
+#
+# 3. PostgreSQL (DATABASE_URL set):
+#    - Falcon + SSR server (web)
+#    - SolidQueue runs in separate worker service
+#
+# Architecture:
+# - Falcon web server: Handles HTTP + async-job inline (fiber concurrency for I/O)
+# - SolidQueue worker: Handles background jobs (emails, exports, maintenance)
+# - SSR server: Inertia server-side rendering (port 13714, localhost)
+# - Mission Control: Monitor SolidQueue at /jobs
+
+set -e
+
+# ============================================================================
+# DEPLOYMENT MODE DETECTION
+# ============================================================================
+# Determine which processes to run based on environment:
+#
+# Worker (SolidQueue):
+#   - Run in-process UNLESS PostgreSQL (which has separate worker service)
+#   - SQLite needs worker (can't scale horizontally, need jobs processed)
+#
+# SSR Server (Node.js process at localhost:13714):
+#   - Runs if bundle exists (needed for SEO, social cards)
+#
+# SSR Supervisor (Bash loop wrapper):
+#   - ONLY for Fly vibecoding (restarts SSR on code changes/crashes)
+#   - Standard deploys run SSR directly (no auto-restart needed)
+# ============================================================================
+
+# Check if PostgreSQL is being used
+IS_POSTGRES="false"
+if [[ "${DATABASE_URL}" =~ ^postgres ]]; then
+  IS_POSTGRES="true"
+fi
+
+# Worker: Run in-process for single-node deploys
+# Reasoning:
+#   - Fly vibecoding (USE_MOUNTED_VIBES): ALWAYS run worker (even with postgres)
+#   - Render SQLite (RENDER_DISK_PATH): ALWAYS run worker (single node, can't scale)
+#   - PostgreSQL (DATABASE_URL): NO worker (separate service scales independently)
+if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+  NEEDS_WORKER="true"   # Fly: Always run worker (single machine constraint)
+elif [ -n "${RENDER_DISK_PATH}" ]; then
+  NEEDS_WORKER="true"   # Render disk: Always run worker (can't scale with disk)
+elif [ "$IS_POSTGRES" = "true" ]; then
+  NEEDS_WORKER="false"  # PostgreSQL: Separate worker service expected
+else
+  NEEDS_WORKER="true"   # Fallback: Run worker (probably SQLite)
+fi
+
+# SSR: Disabled by default to reduce memory pressure (~80-200MB saved)
+# Set ENABLE_SSR=true in Fly secrets to enable (enterprise/heavy-traffic apps)
+# When disabled, Inertia falls back to client-side rendering seamlessly.
+if [ "${ENABLE_SSR}" != "true" ]; then
+  NEEDS_SSR="false"
+  NEEDS_SSR_SUPERVISOR="false"
+else
+  # SSR enabled: Run if bundle exists
+  # Supervisor: ONLY for Fly vibecoding (hot reload/auto-restart)
+  # Standard deploys: Run SSR server directly (no supervisor needed)
+  #
+  # CRITICAL: ONLY check SSR in the SAME location where the app is running from
+  # This prevents loading stale SSR bundles from the wrong location
+  # No fallback to image when running from volume - prevents path mismatches
+  if [ "${USE_MOUNTED_VIBES}" = "true" ] && [ -f "/mnt/data/code/config.ru" ]; then
+    # Running from volume - ONLY check volume (no image fallback)
+    if [ -f "/mnt/data/code/vite/ssr/ssr.js" ]; then
+      NEEDS_SSR="true"
+      NEEDS_SSR_SUPERVISOR="true"   # Fly: hot reload needs supervisor
+    else
+      NEEDS_SSR="false"
+      NEEDS_SSR_SUPERVISOR="false"
+      # This is normal - SSR is optional and may be removed by deployments
+    fi
+  else
+    # Running from image - only use image SSR (standard Rails deployment)
+    if [ -f "/rails/vite/ssr/ssr.js" ]; then
+      NEEDS_SSR="true"
+      NEEDS_SSR_SUPERVISOR="false"  # Standard: just run SSR server
+    else
+      NEEDS_SSR="false"
+      NEEDS_SSR_SUPERVISOR="false"
+    fi
+  fi
+fi
+
+# Simple mode - web server only (no background processes at all)
+# This is rare - only if no worker AND no SSR bundle exists
+if [ "$NEEDS_WORKER" = "false" ] && [ "$NEEDS_SSR" = "false" ]; then
+  echo "🚀 Starting Falcon web server only (no worker, no SSR)"
+  exec bundle exec rails server -b 0.0.0.0 -p "${PORT:-3000}"
+fi
+
+# Multi-process mode - at least one background process (worker or SSR)
+echo "🎨 Starting multi-process server:"
+if [ "$NEEDS_WORKER" = "true" ] && [ "$NEEDS_SSR" = "true" ]; then
+  if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+    echo "   Mode: Fly vibecoding"
+    echo "   Processes: Falcon + SolidQueue + SSR (with supervisor, optional)"
+  elif [ -n "${RENDER_DISK_PATH}" ]; then
+    echo "   Mode: Render SQLite"  
+    echo "   Processes: Falcon + SolidQueue + SSR server (optional)"
+  else
+    echo "   Mode: SQLite"
+    echo "   Processes: Falcon + SolidQueue + SSR server (optional)"
+  fi
+elif [ "$NEEDS_WORKER" = "true" ]; then
+  echo "   Processes: Falcon + SolidQueue (SSR bundle not found, client-side rendering)"
+elif [ "$NEEDS_SSR" = "true" ]; then
+  echo "   Mode: PostgreSQL web"
+  echo "   Processes: Falcon + SSR server (optional, worker separate)"
+fi
+echo ""
+echo "   Note: SSR is optional - app gracefully falls back to client-side rendering"
+echo ""
+
+# Trap signals for graceful shutdown
+cleanup() {
+  echo ""
+  echo "🛑 Shutting down services..."
+  
+  if [ ! -z "$WEB_PID" ]; then
+    echo "   Stopping web server (PID: $WEB_PID)..."
+    kill -TERM $WEB_PID 2>/dev/null || true
+    wait $WEB_PID 2>/dev/null || true
+  fi
+  
+  if [ ! -z "$WORKER_PID" ]; then
+    echo "   Stopping SolidQueue worker (PID: $WORKER_PID)..."
+    kill -TERM $WORKER_PID 2>/dev/null || true
+    wait $WORKER_PID 2>/dev/null || true
+  fi
+  
+  if [ ! -z "$SSR_SUPERVISOR_PID" ]; then
+    echo "   Stopping SSR (PID: $SSR_SUPERVISOR_PID)..."
+    kill -TERM $SSR_SUPERVISOR_PID 2>/dev/null || true
+    wait $SSR_SUPERVISOR_PID 2>/dev/null || true
+    # Also kill any remaining SSR process (supervisor mode)
+    pkill -TERM -f 'node.*ssr\.js' 2>/dev/null || true
+  fi
+  
+  echo "✅ Graceful shutdown complete"
+  exit 0
+}
+
+trap cleanup SIGTERM SIGINT EXIT
+
+# Start SolidQueue worker if needed
+if [ "$NEEDS_WORKER" = "true" ]; then
+  # Check if database is ready
+  # For PostgreSQL: Always ready (external database)
+  # For SQLite: Check if queue database file exists
+  DB_READY="false"
+  
+  if [[ "${DATABASE_URL}" =~ ^postgres ]]; then
+    # PostgreSQL: External database, always ready
+    DB_READY="true"
+  else
+    # SQLite: Check for queue database file
+    if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+      DB_FILE="/mnt/data/sqlite/production_queue.sqlite3"
+    elif [ -n "${RENDER_DISK_PATH}" ]; then
+      DB_FILE="${RENDER_DISK_PATH}/sqlite/production_queue.sqlite3"
+    else
+      DB_FILE="/rails/storage/production_queue.sqlite3"
+    fi
+    
+    if [ -f "$DB_FILE" ]; then
+      DB_READY="true"
+    fi
+  fi
+  
+  # Start worker if database is ready
+  if [ "$DB_READY" = "true" ]; then
+    echo "🔄 Starting SolidQueue worker with config/queue.yml..."
+  bundle exec bin/jobs -c config/queue.yml &
+  WORKER_PID=$!
+  echo "   Worker PID: $WORKER_PID"
+  
+  # Give worker a moment to initialize
+  sleep 0.5
+  
+  # Check if worker is still running
+  if ! kill -0 $WORKER_PID 2>/dev/null; then
+    echo "❌ Worker failed to start"
+    exit 1
+  fi
+else
+  # Database not ready yet - skip worker (web server will still run)
+  echo "⏳ Database not ready yet - skipping SolidQueue worker"
+  echo "   Worker will start automatically on next restart (after migrations complete)"
+    WORKER_PID=""
+  fi
+else
+  WORKER_PID=""
+fi
+
+# Start SSR server if bundle exists (needed for SEO, social cards, fast first paint)
+if [ "$NEEDS_SSR" = "true" ]; then
+  if [ "$NEEDS_SSR_SUPERVISOR" = "true" ]; then
+    # ============================================================================
+    # FLY VIBECODING: SSR with supervisor (hot reload support)
+    # ============================================================================
+    echo "🎨 Starting SSR server with supervisor (hot reload enabled)..."
+  
+    # SSR supervisor loop - runs in background, restarts SSR on crash/code changes
+    # CRITICAL: Circuit breaker to prevent death spirals from broken SSR bundles
+  (
+    # Circuit breaker state (only active when USE_MOUNTED_VIBES='true')
+    SSR_CRASH_COUNT=0
+    SSR_LAST_CRASH_TIME=0
+    SSR_CIRCUIT_BREAKER_THRESHOLD=3
+    SSR_CIRCUIT_BREAKER_WINDOW=60
+    
+    while true; do
+      echo "🔮 [SSR Supervisor] Starting SSR server..."
+      /rails/bin/ssr-server &
+      SSR_PROCESS_PID=$!
+      
+      # Wait for SSR to exit (crash or intentional kill)
+      wait $SSR_PROCESS_PID
+      EXIT_CODE=$?
+      
+      # Exit code 0 = graceful shutdown (SSR bundle not found)
+      # Don't restart in this case - SSR was intentionally disabled
+      if [ $EXIT_CODE -eq 0 ]; then
+        echo "🔮 [SSR Supervisor] SSR exited gracefully (bundle not found or removed)"
+        echo "🔮 [SSR Supervisor] Stopping supervisor - SSR disabled"
+        break
+      fi
+      
+      # ============================================================================
+      # CIRCUIT BREAKER: Prevent death spirals from broken SSR bundles
+      # ============================================================================
+      # In vibecoding mode (USE_MOUNTED_VIBES='true'), SSR is optional
+      # If SSR crashes repeatedly, disable it and let app continue with CSR
+      # In production mode, SSR crashes are fatal (no circuit breaker)
+      # ============================================================================
+      
+      if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+        CURRENT_TIME=$(date +%s)
+        
+        # Reset crash counter if > 60s since last crash (but only if we've had a previous crash)
+        if [ $SSR_LAST_CRASH_TIME -gt 0 ]; then
+          TIME_SINCE_LAST_CRASH=$((CURRENT_TIME - SSR_LAST_CRASH_TIME))
+          if [ $TIME_SINCE_LAST_CRASH -gt $SSR_CIRCUIT_BREAKER_WINDOW ]; then
+            SSR_CRASH_COUNT=0
+            echo "🔮 [SSR Circuit Breaker] Crash window expired, resetting counter"
+          fi
+        fi
+        
+        # Increment crash counter
+        SSR_CRASH_COUNT=$((SSR_CRASH_COUNT + 1))
+        SSR_LAST_CRASH_TIME=$CURRENT_TIME
+        
+        echo "🔮 [SSR Supervisor] SSR crashed with code $EXIT_CODE (crash $SSR_CRASH_COUNT/$SSR_CIRCUIT_BREAKER_THRESHOLD in ${SSR_CIRCUIT_BREAKER_WINDOW}s window)"
+        
+        # Circuit breaker: too many crashes, give up gracefully
+        if [ $SSR_CRASH_COUNT -ge $SSR_CIRCUIT_BREAKER_THRESHOLD ]; then
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🚨 [SSR Circuit Breaker] SSR crashed $SSR_CRASH_COUNT times in ${SSR_CIRCUIT_BREAKER_WINDOW}s"
+          echo "🚨 [SSR Circuit Breaker] DISABLING SSR to prevent app instability"
+          echo ""
+          echo "ℹ️  Your app will continue running with client-side rendering (CSR)"
+          echo "ℹ️  This is SAFE - Inertia gracefully falls back when SSR is unavailable"
+          echo "ℹ️  SSR will auto-enable on next successful deployment"
+          echo ""
+          echo "🔧 To fix: Check your JSX/TSX for syntax errors in:"
+          echo "   - app/javascript/pages/**/*.{jsx,tsx}"
+          echo "   - app/javascript/layouts/**/*.{jsx,tsx}"
+          echo "   - app/javascript/components/**/*.{jsx,tsx}"
+          echo ""
+          echo "💡 SSR crashes are logged above - look for syntax or import errors"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Exit supervisor loop - SSR stays disabled until next deployment
+          break
+        fi
+      else
+        # Production mode (USE_MOUNTED_VIBES != 'true')
+        # SSR crashes are fatal - no circuit breaker
+        echo "🔮 [SSR Supervisor] SSR crashed with code $EXIT_CODE (production mode - no circuit breaker)"
+      fi
+      
+      # Check if bundle still exists (SSR might have been removed by deployment)
+      if [ ! -f "/rails/vite/ssr/ssr.js" ] && [ ! -f "/mnt/data/code/vite/ssr/ssr.js" ]; then
+        echo "🔮 [SSR Supervisor] SSR bundle removed by deployment, stopping supervisor"
+        break
+      fi
+      
+      echo "🔮 [SSR Supervisor] Bundle still exists, restarting in 2s..."
+      sleep 2  # Slightly longer delay to reduce CPU thrashing on rapid crashes
+    done
+  ) &
+  SSR_SUPERVISOR_PID=$!
+  
+  # Give SSR a moment to start
+  sleep 0.5
+  
+  # Check if supervisor is still running (might have exited if no bundle found)
+  if ! kill -0 $SSR_SUPERVISOR_PID 2>/dev/null; then
+    echo "ℹ️  SSR supervisor exited (no SSR bundle available)"
+    echo "   App will run without SSR - client-side rendering only"
+    echo "   To enable SSR: rebuild with 'yarn vite build --ssr' and restart"
+    SSR_SUPERVISOR_PID=""
+  else
+    echo "   ✅ SSR supervisor running (PID: $SSR_SUPERVISOR_PID)"
+    echo "   ✅ SSR ready on port 13714 (auto-restart enabled)"
+  fi
+else
+    # ============================================================================
+    # STANDARD DEPLOY: SSR without supervisor (production, no hot reload)
+    # ============================================================================
+    echo "🎨 Starting SSR server (Inertia rendering)..."
+    
+    # Just start SSR server directly (no supervisor needed)
+    /rails/bin/ssr-server &
+    SSR_PID=$!
+    
+    # Give SSR a moment to start
+    sleep 0.5
+    
+    # Check if SSR is still running (might have exited if no bundle found)
+    if ! kill -0 $SSR_PID 2>/dev/null; then
+      echo "ℹ️  SSR exited (no bundle available)"
+      echo "   App will run without SSR - client-side rendering only"
+      SSR_SUPERVISOR_PID=""
+    else
+      echo "   ✅ SSR server running (PID: $SSR_PID)"
+      echo "   ✅ SSR ready on port 13714"
+      # Track PID for cleanup (but don't wait on it)
+      SSR_SUPERVISOR_PID="$SSR_PID"
+    fi
+  fi
+else
+  SSR_SUPERVISOR_PID=""
+fi
+
+# Start web server (Falcon via Rails)
+# async-job inline runs in the same process (fiber concurrency)
+echo "🌐 Starting web server (Falcon + async-job inline)..."
+bundle exec rails server -b 0.0.0.0 -p "${PORT:-3000}" &
+WEB_PID=$!
+echo "   Web PID: $WEB_PID"
+
+echo ""
+if [ ! -z "$WORKER_PID" ]; then
+  echo "✅ Server running (${DEPLOYMENT_MODE})!"
+  echo "   Web:    http://0.0.0.0:${PORT:-3000} (PID: $WEB_PID)"
+  echo "   Worker: SolidQueue (PID: $WORKER_PID)"
+  if [ ! -z "$SSR_SUPERVISOR_PID" ]; then
+    echo "   SSR:    localhost:13714 (supervisor PID: $SSR_SUPERVISOR_PID, auto-restart)"
+  else
+    echo "   SSR:    Disabled (no bundle found - client-side rendering active)"
+  fi
+  echo "   Jobs:   Mission Control at /jobs"
+  echo "   async:  Inline (fiber concurrency in web process)"
+  echo ""
+  
+  # Wait for critical processes (web or worker only)
+  # SSR supervisor runs independently and auto-restarts SSR
+  wait -n $WEB_PID $WORKER_PID
+  
+  # If we get here, one process died - trigger cleanup
+  echo ""
+  echo "❌ One of the processes died unexpectedly"
+  exit 1
+else
+  echo "✅ Server running (${DEPLOYMENT_MODE}, web only)!"
+  echo "   Web:    http://0.0.0.0:${PORT:-3000} (PID: $WEB_PID)"
+  if [ "$NEEDS_WORKER" = "true" ]; then
+  echo "   Worker: Pending (will start after DB migrations complete)"
+  fi
+  if [ ! -z "$SSR_SUPERVISOR_PID" ]; then
+    echo "   SSR:    localhost:13714 (supervisor PID: $SSR_SUPERVISOR_PID, auto-restart)"
+  else
+    echo "   SSR:    Disabled (no bundle found - client-side rendering active)"
+  fi
+  echo "   async:  Inline (fiber concurrency in web process)"
+  echo ""
+  
+  # Only web server running - wait for it
+  # SSR supervisor runs independently and auto-restarts SSR
+  wait $WEB_PID
+  
+  # If we get here, web died
+  echo ""
+  echo "❌ Web server died unexpectedly"
+  exit 1
+fi

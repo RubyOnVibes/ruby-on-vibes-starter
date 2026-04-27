@@ -1,0 +1,32 @@
+<%#
+  Default result renderer for agent tasks.
+
+  To create a kind-specific renderer, add a partial named after the task kind:
+    app/views/agent_tasks/results/_customer_analysis.html.erb
+    app/views/agent_tasks/results/_data_export.html.erb
+
+  Each partial receives:
+    task   - the AgentTask record
+    result - the task.result hash
+%>
+
+<% if result.present? && result != {} %>
+  <dl class="space-y-2">
+    <% result.each do |key, value| %>
+      <div class="flex flex-col sm:flex-row sm:gap-4">
+        <dt class="text-xs font-medium shrink-0 sm:w-32" style="color: var(--color-muted-foreground);">
+          <%= key.to_s.humanize %>
+        </dt>
+        <dd class="text-sm" style="color: var(--color-foreground);">
+          <% if value.is_a?(Hash) || value.is_a?(Array) %>
+            <pre class="text-xs font-mono mt-1"><%= JSON.pretty_generate(value) %></pre>
+          <% else %>
+            <%= value %>
+          <% end %>
+        </dd>
+      </div>
+    <% end %>
+  </dl>
+<% else %>
+  <p class="text-sm" style="color: var(--color-muted-foreground);">Task completed with no result data.</p>
+<% end %>

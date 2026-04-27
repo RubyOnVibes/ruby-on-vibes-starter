@@ -1,0 +1,3 @@
+# Chat invitation fixtures
+# Note: No pending invitations in fixtures to avoid constraint issues.
+# Tests create their own invitations as needed.

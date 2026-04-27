@@ -1,0 +1,23 @@
+alice_personal:
+  name: Personal Workspace
+  owner: alice
+  is_team_workspace: false
+  billing_email: ""
+  extra_billing_info: ""
+  members_count: 1
+
+bob_personal:
+  name: Personal Workspace
+  owner: bob
+  is_team_workspace: false
+  billing_email: ""
+  extra_billing_info: ""
+  members_count: 1
+
+team_org:
+  name: Acme Corp
+  owner: alice
+  is_team_workspace: true
+  billing_email: billing@acme.example.com
+  extra_billing_info: ""
+  members_count: 2

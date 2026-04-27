@@ -1,0 +1,85 @@
+<%# 
+  EMAIL-SAFE THEME STYLES
+  Uses hardcoded RGB values instead of CSS variables for maximum email client compatibility
+  Based on vibes_tokens helper values - single source of truth for colors
+-%>
+<% tokens = vibes_tokens %>
+<style type="text/css">
+  /* Client-specific Styles */
+  #outlook a { padding: 0; }
+  body { width: 100% !important; -webkit-text-size-adjust: none; margin: 0; padding: 0; }
+  .ReadMsgBody { width: 100%; }
+  .ExternalClass { width: 100%; }
+  
+  /* Reset Styles */
+  img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+  table td { border-collapse: collapse; }
+  
+  /* Typography */
+  body, .bodyContent, .bodyContent div {
+    color: rgb(<%= tokens[:text_1] %>);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  
+  /* Heading Styles */
+  h1, .h1 {
+    color: rgb(<%= tokens[:text_1] %>);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 16px 0;
+  }
+  h2, .h2 {
+    color: rgb(<%= tokens[:text_1] %>);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0 0 12px 0;
+  }
+  
+  /* Text Utilities */
+  .text-secondary { color: rgb(<%= tokens[:text_2] %>); font-size: 15px; }
+  .text-muted { color: rgb(<%= tokens[:text_2] %>); font-size: 14px; }
+  
+  /* Button Styles (use email_button_style helper instead for better compatibility) */
+  .btn {
+    display: inline-block;
+    padding: 12px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .btn-primary {
+    background-color: rgb(<%= tokens[:brand] %>);
+    color: rgb(<%= tokens[:brand_contrast] %>);
+  }
+  .btn-secondary {
+    background-color: rgb(<%= tokens[:surface_2] %>);
+    color: rgb(<%= tokens[:text_1] %>);
+    border: 1px solid rgb(<%= tokens[:surface_3] %>);
+  }
+  
+  /* Link Styles */
+  a { color: rgb(<%= tokens[:brand] %>); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .bodyContent div a:link,
+  .bodyContent div a:visited {
+    color: rgb(<%= tokens[:brand] %>);
+    font-weight: 500;
+  }
+  
+  /* Footer */
+  .addressContent, .addressContent div {
+    color: rgb(<%= tokens[:text_2] %>);
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .addressContent a { color: rgb(<%= tokens[:text_2] %>); }
+</style>

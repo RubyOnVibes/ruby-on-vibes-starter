@@ -1,0 +1,18 @@
+<%# Notifications Index - ERB View %>
+<%# Uses Islands wrapper component for shared React UI %>
+
+<%= turbo_stream_from "notifications_#{current_user.id}" %>
+
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <%# Page Header - Subdued and minimal %>
+  <div class="mb-8">
+    <h1 class="text-2xl font-medium">Notifications</h1>
+  </div>
+  
+  <%# Notifications List Component (Islands) %>
+  <%# Fetches notifications via JSON API with pagination %>
+  <%= react_component('NotificationsIsland', { 
+    initialPage: @pagy.page,
+    totalPages: @pagy.last 
+  }) %>
+</div>

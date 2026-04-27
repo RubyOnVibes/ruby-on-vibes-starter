@@ -1,0 +1,5 @@
+<%= react_component('MadminArrayFieldIsland', {
+  items: Array.wrap(form.object.send(field.attribute_name)),
+  fieldName: "#{form.object_name}[#{field.attribute_name}][]",
+  placeholder: "Add #{field.attribute_name.to_s.humanize.downcase}..."
+}) %>

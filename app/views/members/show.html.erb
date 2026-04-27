@@ -1,0 +1,76 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <!-- Main content -->
+  <main class="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-12 lg:py-6">
+    <div class="max-w-4xl">
+      <% if @member_permissions["same_workspace"] %>
+        <!-- Full view for users in the same workspace -->
+        
+        <!-- Member Header -->
+        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-border">
+          <%= image_tag avatar_url(@member.user), class: "w-16 h-16 rounded-full flex-shrink-0 object-cover" %>
+          <div class="flex-1">
+            <div class="flex items-center gap-3">
+              <h1 class="text-2xl font-semibold text-foreground">@<%= @member.user.username %></h1>
+              <% if @member.workspace_owner? %>
+                <svg class="w-5 h-5 text-warning" fill="currentColor" viewBox="0 0 24 24" title="Workspace Owner">
+                  <path d="M2 19h20v2H2v-2zm2-4l-2-9 6 3 4-6 4 6 6-3-2 9H4z"/>
+                </svg>
+              <% end %>
+            </div>
+            <p class="text-sm text-muted-foreground"><%= @member.workspace.name %></p>
+            <div class="mt-2">
+              <%= render "workspaces/members/copyable_id", member: @member %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Roles -->
+        <div class="mb-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Roles</h2>
+          <div class="flex flex-wrap gap-2">
+            <% @member.active_roles.each do |role| %>
+              <span class="px-3 py-1.5 text-sm rounded-full bg-surface-2 text-foreground font-medium">
+                <%= role.to_s.titleize %>
+              </span>
+            <% end %>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="mt-8 pt-6 border-t border-border flex items-center justify-between">
+          <%= link_to workspace_path(@member.workspace), class: "inline-flex items-center gap-2 text-sm font-medium v-link hover:underline" do %>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to <%= @member.workspace.name %>
+          <% end %>
+          <span class="text-xs text-muted-foreground">Member since <%= @member.created_at.strftime("%b %Y") %></span>
+        </div>
+
+      <% else %>
+        <!-- Limited view for users outside the workspace -->
+        
+        <!-- Member Header (matches full view structure) -->
+        <div class="flex items-center gap-4 mb-6 pb-6 border-b border-border">
+          <%= image_tag avatar_url(@member.user), class: "w-16 h-16 rounded-full flex-shrink-0 object-cover" %>
+          <div class="flex-1">
+            <h1 class="text-2xl font-semibold text-foreground">@<%= @member.user.username %></h1>
+            <p class="text-sm text-muted-foreground"><%= @member.workspace.name %></p>
+            <div class="mt-2">
+              <%= render "workspaces/members/copyable_id", member: @member %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notice -->
+        <div class="p-4 rounded-lg bg-surface-1 border border-border">
+          <p class="text-sm text-muted-foreground">
+            You're viewing limited information because you're not a member of this workspace.
+          </p>
+        </div>
+      <% end %>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,31 @@
+/*
+ * Vibes Template - CSS Architecture
+ *
+ * This template uses a HYBRID approach for Tailwind CSS:
+ *
+ * HOW TAILWIND IS LOADED (see layouts/application.html.erb and layouts/inertia.html.erb):
+ *
+ *   1. USE_MOUNTED_VIBES=true (vibe coding mode):
+ *      → Tailwind CDN: <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.13">
+ *      → _vibes_theme.html.erb provides <style type="text/tailwindcss"> with @theme inline
+ *      → No build step, instant hot reload
+ *
+ *   2. Default (production/development without vibe coding):
+ *      → Propshaft: stylesheet_link_tag :app (loads from app/assets/stylesheets/)
+ *      → Uses tailwindcss-rails gem; vibes_theme.css imported in application.css
+ *
+ *   3. Vite (Inertia pages):
+ *      → Vite build: processes entrypoints/application.css
+ *      → vibes_theme.css imported there too
+ *
+ * THEMED COLOR UTILITIES:
+ * Tailwind v4 @theme inline registers semantic color tokens (primary, foreground, etc.)
+ * Tailwind auto-generates bg-primary, text-foreground, border-border, etc.
+ * The default Tailwind palette is disabled (--color-*: initial).
+ * Only semantic colors + white/black/transparent/current are available.
+ *
+ * TO CUSTOMIZE BRAND COLORS:
+ * Edit vibes_tokens in app/helpers/vibes_helper.rb - changes apply instantly.
+ */
+
+/* This file is informational. See entrypoints/application.css for the Vite entry point. */

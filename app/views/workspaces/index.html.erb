@@ -1,0 +1,80 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-xl">
+      <!-- Header (hidden on mobile where navbar dropdown shows title) -->
+      <div class="hidden lg:block mb-10">
+        <h1 class="text-2xl font-semibold text-foreground tracking-tight">Workspaces</h1>
+      </div>
+
+      <!-- Current Workspace -->
+      <div class="mb-8">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-4">Current</h2>
+        
+        <%= link_to current_workspace, class: "block group" do %>
+          <div class="flex items-center gap-4">
+            <%= workspace_avatar current_workspace, css_class: "w-12 h-12", pixel_size: 48 %>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-foreground group-hover:opacity-80 transition-opacity"><%= current_workspace.name %></div>
+              <div class="text-sm text-muted-foreground">
+                <%= current_workspace.personal? ? "Personal" : "Team" %>
+                · <%= pluralize(current_workspace.members_count, "member") %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <% other_workspaces = @workspaces.reject { |w| w == current_workspace } %>
+
+      <!-- Create / Switch -->
+      <div class="mb-8 pt-8 border-t border-border">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <%= other_workspaces.any? ? "Switch to" : "Workspaces" %>
+          </h2>
+          <% if RubyOnVibes.config.teams? %>
+            <%= link_to new_workspace_path, class: "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors" do %>
+              New
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+            <% end %>
+          <% end %>
+        </div>
+        
+        <% if other_workspaces.any? %>
+          <div class="space-y-1">
+            <% other_workspaces.each do |workspace| %>
+              <%= button_to start_session_workspace_path(workspace.prefix_id),
+                    method: :patch,
+                    class: "w-full flex items-center justify-between gap-4 text-left group rounded-lg py-2 hover:bg-muted/50 transition-colors cursor-pointer" do %>
+                <div class="flex items-center gap-3 min-w-0">
+                  <%= workspace_avatar workspace, css_class: "w-10 h-10", pixel_size: 40 %>
+                  <div class="min-w-0">
+                    <div class="font-medium text-foreground truncate group-hover:text-accent-foreground transition-colors"><%= workspace.name %></div>
+                    <div class="text-xs text-muted-foreground">
+                      <%= workspace.personal? ? "Personal" : "#{workspace.members_count} members" %>
+                    </div>
+                  </div>
+                </div>
+
+                <span class="text-sm text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1 flex-shrink-0">
+                  Enter
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </span>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground">No other workspaces yet</p>
+        <% end %>
+      </div>
+
+      <%= render "application/pagination", pagy: @pagy %>
+    </div>
+  </main>
+</div>

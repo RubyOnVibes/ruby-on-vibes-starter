@@ -1,0 +1,19 @@
+pending_invite:
+  name: Pending User
+  email: pending@example.com
+  workspace: team_org
+  originator: alice
+  token: <%= SecureRandom.hex(20) %>
+  roles:
+    member: true
+    admin: false
+
+admin_invite:
+  name: Admin Invitee
+  email: adminee@example.com
+  workspace: team_org
+  originator: alice
+  token: <%= SecureRandom.hex(20) %>
+  roles:
+    member: true
+    admin: true

@@ -1,0 +1,149 @@
+default: &default
+  adapter: sqlite3
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+
+development:
+  primary:
+    <<: *default
+    database: storage/development.sqlite3
+  cache:
+    <<: *default
+    database: storage/development_cache.sqlite3
+    migrations_paths: <%= ENV['USE_MOUNTED_VIBES'] == 'true' ? '/mnt/data/code/db/cache_migrate' : 'db/cache_migrate' %>
+  queue:
+    <<: *default
+    database: storage/development_queue.sqlite3
+    migrations_paths: <%= ENV['USE_MOUNTED_VIBES'] == 'true' ? '/mnt/data/code/db/queue_migrate' : 'db/queue_migrate' %>
+
+# Warning: The database defined as "test" will be erased and
+# re-generated from your development database when you run "rake".
+# Do not set this db to the same as development or production.
+#
+# Test supports SQLite (default) or PostgreSQL for prod parity
+# Set DATABASE_URL to a PostgreSQL test database URL to use PostgreSQL:
+#   DATABASE_URL=postgresql://localhost/myapp_test bundle exec rspec
+#
+# GitHub Actions example:
+#   env:
+#     DATABASE_URL: postgresql://postgres:postgres@localhost/myapp_test
+#
+test:
+  primary:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% else %>
+    <<: *default
+    database: storage/test.sqlite3
+    <% end %>
+  cache:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    migrations_paths: db/cache_migrate
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% else %>
+    <<: *default
+    database: storage/test_cache.sqlite3
+    migrations_paths: db/cache_migrate
+    <% end %>
+  queue:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    migrations_paths: db/queue_migrate
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% else %>
+    <<: *default
+    database: storage/test_queue.sqlite3
+    migrations_paths: db/queue_migrate
+    <% end %>
+
+# Production supports SQLite (default) or PostgreSQL
+# When DATABASE_URL is set to PostgreSQL, all three DBs use the same connection
+# When DATABASE_URL is SQLite or not set, separate SQLite files are used
+#
+# Note:
+# Supabase pgBouncer transaction mode optimization (prepared_statements: false) is used when the DATABASE_URL is set to a Supabase url.
+#
+# Note:
+# Render Disk SQLite mode (persistent disk) is set by the RENDER_DISK_PATH env var.
+# CRITICAL: During preDeployCommand, disk is not mounted yet (separate compute)
+# So we check if directory exists - if not, use fallback for when the preDeployCommand is run.
+#
+production:
+  primary:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% elsif ENV['RENDER_DISK_PATH'] %>
+    <<: *default
+    database: <%= Dir.exist?(ENV['RENDER_DISK_PATH'].to_s) ? "#{ENV['RENDER_DISK_PATH']}/sqlite/production.sqlite3" : "storage/production.sqlite3" %>
+    <% elsif ENV['USE_MOUNTED_VIBES'] == 'true' %>
+    <<: *default
+    database: /mnt/data/sqlite/production.sqlite3
+    <% else %>
+    <<: *default
+    database: storage/production.sqlite3
+    <% end %>
+    
+  cache:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    migrations_paths: <%= ENV['USE_MOUNTED_VIBES'] == 'true' ? '/mnt/data/code/db/cache_migrate' : 'db/cache_migrate' %>
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% elsif ENV['RENDER_DISK_PATH'] %>
+    <<: *default
+    database: <%= Dir.exist?(ENV['RENDER_DISK_PATH'].to_s) ? "#{ENV['RENDER_DISK_PATH']}/sqlite/production_cache.sqlite3" : "storage/production_cache.sqlite3" %>
+    migrations_paths: db/cache_migrate
+    <% elsif ENV['USE_MOUNTED_VIBES'] == 'true' %>
+    <<: *default
+    database: /mnt/data/sqlite/production_cache.sqlite3
+    migrations_paths: /mnt/data/code/db/cache_migrate
+    <% else %>
+    <<: *default
+    database: storage/production_cache.sqlite3
+    migrations_paths: db/cache_migrate
+    <% end %>
+    
+  queue:
+    <% if ENV['DATABASE_URL']&.start_with?('postgres') %>
+    url: <%= ENV.fetch("DATABASE_URL") %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    timeout: 5000
+    migrations_paths: <%= ENV['USE_MOUNTED_VIBES'] == 'true' ? '/mnt/data/code/db/queue_migrate' : 'db/queue_migrate' %>
+    <% if ENV["DATABASE_URL"]&.include?("pooler.supabase.com:6543") %>
+    prepared_statements: false
+    <% end %>
+    <% elsif ENV['RENDER_DISK_PATH'] %>
+    <<: *default
+    database: <%= Dir.exist?(ENV['RENDER_DISK_PATH'].to_s) ? "#{ENV['RENDER_DISK_PATH']}/sqlite/production_queue.sqlite3" : "storage/production_queue.sqlite3" %>
+    migrations_paths: db/queue_migrate
+    <% elsif ENV['USE_MOUNTED_VIBES'] == 'true' %>
+    <<: *default
+    database: /mnt/data/sqlite/production_queue.sqlite3
+    migrations_paths: /mnt/data/code/db/queue_migrate
+    <% else %>
+    <<: *default
+    database: storage/production_queue.sqlite3
+    migrations_paths: db/queue_migrate
+    <% end %>

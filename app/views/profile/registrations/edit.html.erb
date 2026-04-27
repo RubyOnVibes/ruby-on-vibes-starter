@@ -1,0 +1,151 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-xl">
+      <!-- Header (hidden on mobile where navbar dropdown shows title) -->
+      <div class="hidden lg:block mb-10">
+        <h1 class="text-2xl font-semibold text-foreground tracking-tight">Profile</h1>
+      </div>
+
+      <%= form_with(model: current_user, url: profile_registration_path, method: :put) do |f| %>
+        <%= render "error_messages", resource: current_user %>
+
+        <!-- Avatar -->
+        <div class="mb-10">
+          <div id="user-avatar-preview-container" class="mb-4">
+            <% if current_user.avatar.attached? && current_user.avatar.variable? %>
+              <%= image_tag avatar_url(current_user, size: 96), class: "w-24 h-24 rounded-full object-cover" %>
+            <% else %>
+              <span class="user-avatar-initials w-24 h-24 rounded-full flex items-center justify-center text-3xl font-semibold">
+                <%= current_user.first_name&.first&.upcase || current_user.email&.first&.upcase || "?" %><%= current_user.last_name&.first&.upcase %>
+              </span>
+            <% end %>
+          </div>
+          <div>
+            <%= f.file_field :avatar, 
+                id: "user-avatar-input",
+                accept: "image/*",
+                class: "text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:text-sm file:font-medium file:bg-transparent file:text-foreground file:cursor-pointer hover:file:bg-surface-1 file:transition-colors" %>
+            <p class="text-xs text-muted-foreground mt-1.5">JPG, PNG, or GIF</p>
+          </div>
+        </div>
+
+        <!-- Basic Info -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Basic info</h2>
+          
+          <div class="space-y-5">
+            <!-- First Name -->
+            <div>
+              <%= f.label :first_name, "First name", class: "block text-sm font-medium text-foreground mb-2" %>
+              <%= f.text_field :first_name, 
+                  autocomplete: "given-name",
+                  class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+            </div>
+
+            <!-- Last Name -->
+            <div>
+              <%= f.label :last_name, "Last name", class: "block text-sm font-medium text-foreground mb-2" %>
+              <%= f.text_field :last_name, 
+                  autocomplete: "family-name",
+                  class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+            </div>
+
+            <!-- Username -->
+            <div>
+              <%= f.label :username, class: "block text-sm font-medium text-foreground mb-2" %>
+              <%= f.text_field :username,
+                  autocomplete: "username",
+                  class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+              <p class="text-xs text-muted-foreground mt-2">Lowercase letters, numbers, and underscores · 3-20 characters</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Contact</h2>
+          
+          <div>
+            <%= f.label :email, class: "block text-sm font-medium text-foreground mb-2" %>
+            <%= f.email_field :email, 
+                autocomplete: "email",
+                class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+            
+            <% if current_user.unconfirmed_email.present? %>
+              <p class="text-sm text-muted-foreground mt-3">
+                Confirmation pending for <span class="font-mono"><%= current_user.unconfirmed_email %></span>
+              </p>
+            <% else %>
+              <p class="text-xs text-muted-foreground mt-2">Changing your email may require confirmation</p>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Preferences -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Preferences</h2>
+          
+          <div>
+            <%= f.label :time_zone, "Time zone", class: "block text-sm font-medium text-foreground mb-2" %>
+            <%= f.time_zone_select :time_zone, 
+                nil,
+                { default: Time.zone.name },
+                class: "w-full px-3 py-2 text-sm text-foreground bg-transparent border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow" %>
+          </div>
+        </div>
+
+        <!-- Member ID -->
+        <div class="mb-10">
+          <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-4">Workspace identity</h2>
+          
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm text-foreground mb-1">Member ID for <%= Current.workspace.name %></p>
+              <code class="text-sm font-mono text-muted-foreground"><%= current_member.to_param %></code>
+            </div>
+            <button
+              type="button"
+              onclick="navigator.clipboard.writeText('<%= current_member.to_param %>').then(() => { this.textContent = 'Copied'; setTimeout(() => this.textContent = 'Copy', 1500) })"
+              class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+          <p class="text-xs text-muted-foreground mt-3">Share this ID to let others add you to group chats</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-4 pt-8 border-t border-border">
+          <%= f.submit "Save changes", class: "btn btn-sm btn-primary" %>
+          <%= link_to "Cancel", :back, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" %>
+        </div>
+      <% end %>
+    </div>
+  </main>
+</div>
+
+<%= render "shared/turbo_script" do %>
+  const input = document.getElementById('user-avatar-input');
+  const container = document.getElementById('user-avatar-preview-container');
+  
+  if (!input || !container) return;
+  
+  function previewAvatar(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      container.innerHTML = `<img src="${event.target.result}" alt="Avatar preview" class="w-24 h-24 rounded-full object-cover">`;
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  input.addEventListener('change', previewAvatar);
+  
+  return () => {
+    input.removeEventListener('change', previewAvatar);
+  };
+<% end %>

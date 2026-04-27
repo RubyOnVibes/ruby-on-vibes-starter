@@ -1,0 +1,11 @@
+# Async adapter works within the same process
+# ChatStreamJob uses async_job with Inline processor → runs in Falcon web process
+# This keeps ActionCable + streaming in sync (same process)
+development:
+  adapter: async
+
+test:
+  adapter: test
+
+production:
+  adapter: async

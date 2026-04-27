@@ -1,0 +1,140 @@
+<% if RubyOnVibes.config.stripe? %>
+  <div class="py-8 lg:py-12 px-4 mx-auto max-w-4xl w-full">
+    <h1 class="mb-6 lg:mb-10 text-3xl lg:text-4xl font-bold text-center text-foreground">
+      Subscribe to <%= @plan.name %>
+    </h1>
+
+    <%= render "payments/checkout/embed_stripe_checkout", client_secret: @checkout_session.client_secret %>
+
+    <div class="mt-8">
+      <%= render "payments/checkout/testimonial" %>
+    </div>
+  </div>
+<% else %>
+  <div class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 lg:py-12">
+      <!-- Left Column: Plan Details -->
+      <div class="bg-card border-card border rounded-2xl shadow-sm p-6 lg:p-8">
+        <div class="mb-6">
+          <% if @plan.trial_period? %>
+            <div>
+              <h1 class="font-semibold text-lg text-muted-foreground">Try <%= @plan.name %></h1>
+              <h3 class="my-2 font-bold text-4xl text-foreground"><%= @plan.trial_period_days %> days free</h3>
+              <p class="font-medium text-muted-foreground">Then <span id="recurringTotal"><%= pay_amount_to_currency(@plan) %></span> per <%= plan_interval(@plan) %></p>
+            </div>
+          <% else %>
+            <div>
+              <h1 class="font-semibold text-lg text-muted-foreground">Subscribe to <%= @plan.name %></h1>
+              <div class="flex items-center mt-2">
+                <h3 id="recurringTotal" class="font-bold text-5xl text-foreground"><%= pay_amount_to_currency(@plan) %></h3>
+                <div class="ml-3 font-medium text-sm text-muted-foreground leading-tight">
+                  <% if @plan.unit_label? %>
+                    <div>per <%= @plan.unit_label %></div>
+                    <div>per <%= plan_interval(@plan) %></div>
+                  <% else %>
+                    <div>per</div>
+                    <div><%= plan_interval(@plan) %></div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <% if @plan.taxed? && @stripe_invoice %>
+          <div class="mb-6 p-4 bg-surface-1 rounded-lg">
+            <div class="flex justify-between mb-3 text-sm font-medium text-foreground">
+              <div><%= t(".subtotal") %></div>
+              <div><%= Pay::Currency.format(@stripe_invoice.subtotal, currency: @stripe_invoice.currency) %></div>
+            </div>
+
+            <hr class="mb-3 border-border">
+
+            <div class="space-y-2 mb-3 text-sm text-muted-foreground">
+              <% @stripe_invoice.total_tax_amounts.each do |tax| %>
+                <div class="flex justify-between">
+                  <div>
+                    <%= tax.tax_rate.jurisdiction %>
+                    <%= tax.tax_rate.display_name %>
+                    (<%= tax.tax_rate.percentage %>%)
+                  </div>
+                  <div><%= Pay::Currency.format(tax.amount, currency: @stripe_invoice.currency) %></div>
+                </div>
+              <% end %>
+            </div>
+
+            <hr class="mb-3 border-border">
+
+            <div class="flex justify-between text-base font-semibold text-foreground">
+              <div><%= t(".total") %></div>
+              <div><%= Pay::Currency.format(@stripe_invoice.total, currency: @stripe_invoice.currency) %></div>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-base text-foreground mb-4">What's included:</h3>
+          <div class="space-y-3">
+            <% @plan.features.each do |plan_feature| %>
+              <div class="flex items-start gap-3 text-foreground">
+                <svg xmlns="http://www.w3.org/2000/svg" class="shrink-0 mt-0.5 text-primary h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                <div class="text-sm"><%= plan_feature %></div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="hidden lg:block">
+          <%= render "payments/checkout/testimonial" %>
+        </div>
+      </div>
+
+      <!-- Right Column: Account & Payment -->
+      <div class="bg-card border-card border rounded-2xl shadow-sm p-6 lg:p-8">
+        <h2 class="text-2xl font-bold text-foreground mb-6"><%= t(".title") %></h2>
+
+        <div class="mb-8">
+          <h3 class="text-foreground font-semibold mb-3 pb-3 border-b border-border"><%= t(".account") %></h3>
+          <div class="flex items-center gap-4">
+            <%= workspace_avatar current_workspace %>
+            <h4 class="font-medium text-foreground"><%= current_workspace.name %></h4>
+          </div>
+        </div>
+
+        <div class="mb-8">
+          <h3 class="text-foreground font-semibold mb-4 pb-3 border-b border-border"><%= t("subscriptions.new.payment_method") %></h3>
+          <div>
+            <% if @plan.trial_period? %>
+              <p class="text-sm text-muted-foreground leading-relaxed">
+                After your trial ends, you will be charged <%= pay_amount_to_currency(@plan) %> per <%= plan_interval(@plan) %> starting <%= l @plan.trial_period_days.days.from_now.to_date, format: :long %>. You can always cancel before then.
+              </p>
+            <% else %>
+              <p class="text-sm text-muted-foreground leading-relaxed">
+                By confirming your subscription, you allow <%= RubyOnVibes.config.application_name %> to charge your payment method for this payment and future payments in accordance with our terms.
+              </p>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="pt-6 border-t border-border">
+          <div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+            </svg>
+            <span>
+              <%= t(".help") %>
+              <%= t(".contact_html", link: mail_to(RubyOnVibes.config.support_email, t(".contact_support"), subject: t(".contact_subject", product: RubyOnVibes.config.application_name), class: "v-link font-medium")) %>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Testimonial for mobile -->
+      <div class="lg:hidden">
+        <%= render "payments/checkout/testimonial" %>
+      </div>
+    </div>
+  </div>
+<% end %>

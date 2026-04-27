@@ -1,0 +1,295 @@
+<% content_for(:title, 'Chat') %>
+<% content_for :body_class, 'overflow-hidden' %>
+<% @sticky_nav_footer = true %>
+
+<style nonce="<%= content_security_policy_nonce %>">
+  .chat-messages-scroll::-webkit-scrollbar,
+  .chat-sidebar-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .chat-messages-scroll::-webkit-scrollbar-track,
+  .chat-sidebar-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .chat-messages-scroll::-webkit-scrollbar-thumb,
+  .chat-sidebar-list::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-border) 40%, transparent);
+    border-radius: 3px;
+  }
+  
+  .chat-messages-scroll::-webkit-scrollbar-thumb:hover,
+  .chat-sidebar-list::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+  
+  .chat-messages-scroll,
+  .chat-sidebar-list {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-border) 40%, transparent) transparent;
+  }
+  
+  .chat-sidebar-list {
+    overflow-x: visible !important;
+    /* Ensure the scrollbar doesn't overlap with border */
+    padding-right: 2px;
+  }
+  
+  .chat-sidebar {
+    background-color: var(--color-surface-0);
+  }
+
+  /* Mobile: Solid background with shadow */
+  @media (max-width: 1023px) {
+    .chat-sidebar {
+      background-color: var(--color-background);
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Enable vertical scrolling on mobile - dropdowns should use position:fixed */
+    .chat-sidebar-list {
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+    }
+  }
+  
+  /* Desktop: Subtle background with border */
+  @media (min-width: 1024px) {
+    .chat-sidebar {
+      box-shadow: none;
+      border-right: 1px solid var(--color-border);
+    }
+  }
+  
+  .chat-list-item { color: var(--color-muted-foreground); }
+  .chat-list-item:not(.active):hover { background-color: var(--color-surface-1); color: var(--color-foreground); }
+  .chat-list-item.active { background-color: var(--color-surface-2); color: var(--color-foreground); font-weight: 500; }
+  .new-chat-btn { background-color: transparent; color: var(--color-foreground); border: none; }
+  .new-chat-btn:hover { background-color: var(--color-surface-1); }
+  .mobile-sidebar-toggle { background-color: transparent; color: var(--color-muted-foreground); }
+  .mobile-sidebar-toggle:hover { background-color: var(--color-surface-1); color: var(--color-foreground); }
+  
+  .mobile-sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  html.dark .mobile-sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+  
+  .chat-sidebar-mobile {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-100%);
+  }
+  
+  .chat-sidebar-mobile.show-mobile {
+    transform: translateX(0);
+  }
+  
+  @media (max-width: 1023px) {
+    [data-sidebar] {
+      display: flex !important;
+      position: fixed !important;
+    }
+    [data-sidebar]:not(.show-mobile) {
+      transform: translateX(-100%);
+      pointer-events: none;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    [data-sidebar] {
+      display: flex !important;
+      position: relative !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      transform: none !important;
+    }
+  }
+  
+  .chat-user-avatar { background-color: var(--color-primary); color: var(--color-primary-foreground); }
+  .chat-user-name { color: var(--color-foreground); }
+  .chat-sidebar-footer { border-color: var(--color-border); }
+  .chat-ws-name { color: var(--color-muted-foreground); font-size: 0.75rem; }
+
+  /* Collapsible sidebar sections */
+  .sidebar-section-toggle { background: none; border: none; text-align: left; }
+  .sidebar-section-content { transition: max-height 0.2s ease, opacity 0.15s ease; overflow: hidden; }
+  .sidebar-section-content.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+  .sidebar-chevron { transition: transform 0.2s ease; }
+  .sidebar-chevron.collapsed { transform: rotate(-90deg); }
+  
+  /* Desktop: hardcoded navbar subtraction (stable, no dynamic browser chrome) */
+  #chat-container-wrapper {
+    height: calc(100vh - 72px);
+    max-height: calc(100vh - 72px);
+    overflow: hidden;
+  }
+
+  /* Mobile: flexbox fills remaining space — no hardcoded pixel subtraction needed.
+     Body is flex column at 100dvh, navbar takes natural height, main gets the rest. */
+  @media (max-width: 1023px) {
+    body.overflow-hidden {
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.overflow-hidden main {
+      flex: 1;
+      min-height: 0 !important; /* Override Tailwind min-h-screen */
+    }
+
+    #chat-container-wrapper {
+      height: 100%;
+      max-height: 100%;
+    }
+
+    #mobile-sidebar {
+      top: 0 !important;
+      height: 100dvh !important;
+      padding-top: 0;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    #mobile-sidebar {
+      height: 100% !important;
+      padding-top: 0;
+      top: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+    }
+  }
+
+  .chat-sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.overflow-hidden {
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  body.overflow-hidden main {
+    overflow: hidden;
+  }
+</style>
+
+<div id="chat-container-wrapper" class="w-full flex overflow-hidden" style="background-color: var(--color-background); border-top: 1px solid var(--color-border);">
+  <div id="mobile-sidebar-overlay" class="mobile-sidebar-overlay fixed inset-0 z-40 hidden opacity-0" onclick="closeChatSidebar()" ontouchstart="closeChatSidebar()"></div>
+  
+  <script nonce="<%= content_security_policy_nonce %>">
+    function closeChatSidebar(event) {
+      // Only close on mobile
+      if (window.innerWidth >= 1024) return;
+
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar) sidebar.classList.remove('show-mobile');
+      if (overlay) {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+
+    function toggleSidebarSection(sectionName) {
+      const section = document.querySelector('[data-sidebar-section="' + sectionName + '"]');
+      if (!section) return;
+
+      const content = section.querySelector('.sidebar-section-content');
+      const chevron = section.querySelector('.sidebar-chevron');
+      if (!content) return;
+
+      const isCollapsed = content.classList.contains('collapsed');
+      if (isCollapsed) {
+        content.classList.remove('collapsed');
+        if (chevron) chevron.classList.remove('collapsed');
+        try { localStorage.setItem('sidebar_' + sectionName, 'open'); } catch(e) {}
+      } else {
+        content.classList.add('collapsed');
+        if (chevron) chevron.classList.add('collapsed');
+        try { localStorage.setItem('sidebar_' + sectionName, 'closed'); } catch(e) {}
+      }
+    }
+
+    // Restore collapsed state from localStorage
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('[data-sidebar-section]').forEach(function(section) {
+        var name = section.getAttribute('data-sidebar-section');
+        try {
+          var state = localStorage.getItem('sidebar_' + name);
+          if (state === 'closed') {
+            var content = section.querySelector('.sidebar-section-content');
+            var chevron = section.querySelector('.sidebar-chevron');
+            if (content) content.classList.add('collapsed');
+            if (chevron) chevron.classList.add('collapsed');
+          }
+        } catch(e) {}
+      });
+    });
+  </script>
+  
+  <%= render "shared/turbo_script" do %>
+    const buttons = document.querySelectorAll('.mobile-sidebar-toggle');
+    if (!buttons.length) return;
+    
+    function openSidebar() {
+      const sidebar = document.getElementById('mobile-sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      if (sidebar && overlay) {
+        sidebar.classList.add('show-mobile');
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.add('opacity-100'), 10);
+      }
+    }
+    
+    buttons.forEach(button => button.addEventListener('click', openSidebar));
+    
+    return () => {
+      buttons.forEach(button => button.removeEventListener('click', openSidebar));
+    };
+  <% end %>
+  
+  <%= render "chats/chat_sidebar", active_chat_id: @chat&.id, active_invitation_id: @invitation&.id, nonce: content_security_policy_nonce %>
+  
+  <div class="flex-1 flex flex-col min-w-0 w-full" style="background-color: var(--color-background);">
+    <% if @chat.present? %>
+    <%= turbo_stream_from "chat_#{@chat.id}" %>
+    
+    <div id="chat-run-state-container" style="display: none;" aria-hidden="true">
+      <% if @active_chat_run.present? %>
+        <%= render partial: 'chat_runs/state', locals: { chat_run: @active_chat_run } %>
+      <% else %>
+        <div id="chat-run-state"></div>
+      <% end %>
+    </div>
+    
+    <div id="messages-container" style="display: none;" aria-hidden="true">
+      <div id="messages">
+        <%= render @messages %>
+      </div>
+    </div>
+    <% end %>
+    
+    <div id="chat-panel-container" class="flex-1 min-h-0 w-full" style="background-color: var(--color-background)"
+         data-initial-state='<%= {
+           "chatId" => @chat&.to_param,
+           "chatName" => @chat&.name,
+           "showToolCalls" => @show_tool_calls,
+           "permissions" => @chat_permissions,
+           "isGroupChat" => @chat&.has_multiple_members,
+           "isAgentChat" => @chat&.agent?
+         }.to_json %>'>
+      <%= react_component "ChatIsland", { containerId: "chat-panel-container" }, {
+        container_id: "chat-panel-container"
+      } %>
+    </div>
+  </div>
+</div>

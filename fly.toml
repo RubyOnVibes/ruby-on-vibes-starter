@@ -1,0 +1,45 @@
+app = "vibes-template"
+primary_region = "iad"
+
+[build]
+image = "registry.fly.io/vibes-template-docker:spec295"
+
+# Remove release_command - volumes not available during release phase
+
+# Single process: web + worker + SSR all in one machine
+
+[env]
+  RAILS_ENV = "production"
+  RAILS_SERVE_STATIC_FILES = "true"
+  RAILS_LOG_TO_STDOUT = "true"
+  ALLOW_IFRAME_EMBEDDING = "true"
+
+[[mounts]]
+  source = "app_data"
+  destination = "/mnt/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Optimized for hot bundle installs and parallel operations
+# 4 shared CPUs: Fast gem compilation (native extensions build in parallel)
+# 2GB RAM: Sufficient for Rails + Redis + moderate bundle operations
+[vm]
+  memory = "2048mb"
+  cpus = 8
+  cpu_kind = "shared"
+
+[[http_service.checks]]
+  grace_period = "60s"   # 60s for Rails boot + SSR startup (hot bundle usually cached)
+  interval = "10s"       # Check frequently for fast failure detection
+  method = "GET"
+  timeout = "5s"         # Faster timeout for quicker failure signals
+  path = "/up"
+
+[[statics]]
+  guest_path = "/rails/public"
+  url_prefix = "/"

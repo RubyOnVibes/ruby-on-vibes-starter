@@ -1,0 +1,60 @@
+<%# locals: (active_class: "bg-surface-2 text-foreground", inactive_class: "text-muted-foreground hover:bg-surface-1 hover:text-foreground") -%>
+<%#
+  Sidebar Nav - React Island with ERB Placeholder
+
+  The React component (SettingsSidebarIsland) hydrates over this ERB placeholder.
+  Nav items come from settings_nav_items helper (single source of truth).
+  React reads from window.App.data().settingsNavItems and window.Auth.user()
+
+  Both ERB and React read the same data, ensuring consistency during hydration.
+%>
+
+<style>
+  .user-ws-name { color: var(--color-foreground); }
+  .current-workspace-name { color: var(--color-muted-foreground); font-size: 0.7rem; }
+</style>
+
+<%
+  # Use shared helper for nav items (single source of truth)
+  nav_items = settings_nav_items
+
+  # Find current active label for mobile header
+  current_label = nav_items.find do |item|
+    if item[:startsWithPath]
+      request.path.start_with?(item[:startsWithPath])
+    else
+      request.path == item[:path]
+    end
+  end&.fetch(:label) || nav_items.first&.fetch(:label, "Settings")
+%>
+
+<%# React island - reads from window globals, no props needed %>
+<%= react_component('SettingsSidebarIsland') do %>
+  <%# ERB placeholder - shown until React hydrates, also works without JS %>
+
+  <!-- Mobile: Dropdown Navigation (non-interactive placeholder) -->
+  <div class="lg:hidden -mx-4 sm:-mx-6">
+    <button type="button"
+            class="w-full flex items-center justify-between px-4 sm:px-6 py-3 transition-colors cursor-pointer border-b border-transparent hover:bg-surface-1">
+      <div class="flex flex-col items-start">
+        <span class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Settings</span>
+        <span class="text-2xl font-bold text-foreground -mt-0.5"><%= current_label %></span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+           class="w-5 h-5 text-muted-foreground flex-shrink-0">
+        <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Desktop: Vertical Navigation -->
+  <nav class="hidden lg:block space-y-1">
+    <% nav_items.each do |item| %>
+      <%= active_link_to item[:label], item[:path],
+          class: "block no-underline px-4 py-3 rounded-lg text-sm font-medium transition-all",
+          active_class: active_class,
+          inactive_class: inactive_class,
+          starts_with: item[:startsWithPath] %>
+    <% end %>
+  </nav>
+<% end %>

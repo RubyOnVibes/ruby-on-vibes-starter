@@ -1,0 +1,9 @@
+alice_personal_chat:
+  member: alice_personal_member
+  name: "Alice's Chat"
+  has_multiple_members: false
+
+team_chat:
+  member: alice_team_member
+  name: "Team Discussion"
+  has_multiple_members: true

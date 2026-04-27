@@ -1,0 +1,28 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <!-- Main content -->
+  <main class="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-12 lg:py-6">
+    <div class="max-w-2xl">
+      <!-- Breadcrumb -->
+      <div class="flex items-center gap-2 mb-3">
+        <%= link_to "Billing Plan", payments_path, class: "v-link-muted text-sm" %>
+        <%= chevron_right_icon(class: "w-4 h-4 text-muted-foreground") %>
+        <span class="text-sm text-muted-foreground"><%= t(".payment_details") %></span>
+      </div>
+
+      <h1 class="v-page-heading text-foreground"><%= t(".payment_details") %></h1>
+
+      <% if @subscription.past_due? || @subscription.unpaid? %>
+        <div class="flex items-start gap-3 p-4 rounded-lg bg-surface-1 border border-border mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-destructive flex-shrink-0 mt-0.5">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+          </svg>
+          <p class="text-destructive font-medium"><%= t ".past_due" %></p>
+        </div>
+      <% end %>
+
+      <%= render "payments/subscriptions/payment_methods/forms/fake_processor", subscription: @subscription if @payment_processor.fake_processor? %>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,51 @@
+<%= form_with(model: [@workspace, member], class: "max-w-2xl") do |form| %>
+  <%= render "error_messages", resource: form.object %>
+
+  <!-- Member Info -->
+  <div class="mb-6">
+    <label class="block text-sm font-medium text-foreground mb-2">Member</label>
+    <div class="flex items-center gap-3 p-3 bg-surface-1 rounded-lg border border-border">
+      <%= image_tag avatar_url(member.user, size: 40), class: "w-10 h-10 rounded-full" %>
+      <div>
+        <div class="font-medium text-foreground"><%= member.user.name %></div>
+        <div class="text-sm text-muted-foreground"><%= member.user.email %></div>
+      </div>
+      <% if member.workspace_owner? %>
+        <span class="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-warning/10 text-warning">Owner</span>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Roles -->
+  <div class="mb-6">
+    <%= form.label :roles, "Roles & Permissions", class: "block text-sm font-medium text-foreground mb-3" %>
+    
+    <div class="space-y-3">
+      <% Member::ROLES.each do |role| %>
+        <% disabled = role == :admin && member.workspace_owner? %>
+        <label class="flex items-start gap-3 p-3 bg-surface-1 rounded-lg border border-border hover:bg-surface-2 transition-colors <%= disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer' %>">
+          <%= form.check_box role, class: "mt-0.5", disabled: disabled %>
+          <div class="flex-1">
+            <div class="font-medium text-foreground"><%= role.to_s.titleize %></div>
+            <div class="text-xs text-muted-foreground mt-1">
+              <% if role == :admin %>
+                Full access to manage workspace settings, billing, and team members
+                <% if member.workspace_owner? %>
+                  <span class="block mt-1 text-warning">(Cannot be removed from workspace owner)</span>
+                <% end %>
+              <% elsif role == :member %>
+                Basic access to workspace resources
+              <% end %>
+            </div>
+          </div>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex gap-3">
+    <%= form.submit "Update Member", class: "btn btn-primary" %>
+    <%= link_to "Cancel", @workspace, class: "btn btn-secondary" %>
+  </div>
+<% end %>

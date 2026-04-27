@@ -1,0 +1,13 @@
+<%# Shared settings sidebar layout with fixed footer %>
+<aside class="lg:w-64 lg:border-r v-divider lg:flex lg:flex-col lg:fixed lg:top-[72px] lg:bottom-0 lg:left-0">
+  <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto px-4 py-6 sm:p-6 lg:p-6">
+    <%= render partial: "sidebar_nav" %>
+  </div>
+  <!-- Footer only shows on desktop (lg+) -->
+  <div class="hidden lg:block lg:flex-shrink-0">
+    <%= render "application/user_workspace_footer" %>
+  </div>
+</aside>
+
+<!-- Spacer for fixed sidebar on desktop -->
+<div class="hidden lg:block lg:w-64"></div>

@@ -1,0 +1,27 @@
+<%
+  pricing = field.value(record)
+%>
+<% if pricing.present? %>
+  <div class="pricing-details space-y-3">
+    <% pricing.each do |category, tiers| %>
+      <div class="pricing-category">
+        <h4 class="text-sm font-semibold text-foreground capitalize mb-1"><%= category.to_s.humanize %></h4>
+        <% tiers.each do |tier_name, prices| %>
+          <div class="tier pl-3 py-1 border-l-2 border-border mb-2">
+            <span class="text-xs font-medium text-muted-foreground uppercase"><%= tier_name %></span>
+            <div class="prices flex flex-wrap gap-3 mt-1">
+              <% prices.each do |price_type, amount| %>
+                <span class="text-sm">
+                  <span class="text-muted-foreground"><%= price_type.to_s.humanize.gsub("Per million", "/M") %>:</span>
+                  <span class="font-medium text-foreground">$<%= number_with_precision(amount, precision: amount < 0.01 ? 4 : 2, strip_insignificant_zeros: true) %></span>
+                </span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <span class="text-muted-foreground">No pricing data</span>
+<% end %>

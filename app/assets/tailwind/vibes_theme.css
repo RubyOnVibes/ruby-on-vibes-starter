@@ -1,0 +1,73 @@
+/*
+ * Vibes Theme - Tailwind v4 @theme integration
+ *
+ * Registers semantic color tokens with Tailwind so utilities like
+ * bg-primary, text-foreground, border-border are generated automatically.
+ *
+ * Uses @theme inline to avoid creating extra CSS custom properties —
+ * the --vibes-* / --color-* vars are defined separately in _vibes_theme.html.erb.
+ *
+ * CANONICAL SOURCE for semantic color names.
+ * CDN mode auto-includes this file via File.read in _vibes_theme.html.erb.
+ */
+
+@theme inline {
+  /* Reset Tailwind's entire default color palette */
+  --color-*: initial;
+
+  /* Preserve essential non-theme colors */
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* Core semantic colors */
+  --color-background: var(--vibes-surface-0);
+  --color-foreground: var(--vibes-text-1);
+  --color-muted: var(--vibes-surface-1);
+  --color-muted-foreground: var(--vibes-text-2);
+  --color-primary: var(--vibes-brand);
+  --color-primary-foreground: var(--vibes-brand-contrast);
+  --color-secondary: var(--vibes-secondary);
+  --color-secondary-foreground: var(--vibes-text-1);
+  --color-accent: var(--vibes-accent);
+  --color-accent-foreground: var(--vibes-text-1);
+  --color-destructive: var(--vibes-danger);
+  --color-destructive-foreground: #fff;
+
+  /* Border, input, ring */
+  --color-border: var(--vibes-surface-3);
+  --color-input: var(--vibes-surface-3);
+  --color-ring: var(--vibes-ring);
+
+  /* Card */
+  --color-card: var(--vibes-surface-0);
+  --color-card-foreground: var(--vibes-text-1);
+
+  /* Popover (dropdowns, tooltips, modals) */
+  --color-popover: var(--vibes-surface-0);
+  --color-popover-foreground: var(--vibes-text-1);
+
+  /* Surface levels */
+  --color-surface-0: var(--vibes-surface-0);
+  --color-surface-1: var(--vibes-surface-1);
+  --color-surface-2: var(--vibes-surface-2);
+  --color-surface-3: var(--vibes-surface-3);
+
+  /* Status colors */
+  --color-info: var(--vibes-info);
+  --color-info-foreground: var(--vibes-info-contrast);
+  --color-warning: var(--vibes-warning);
+  --color-warning-foreground: var(--vibes-warning-contrast);
+  --color-success: var(--vibes-success);
+  --color-success-foreground: var(--vibes-success-contrast);
+
+  /* Chart colors (data visualization) */
+  --color-chart-1: var(--vibes-chart-1);
+  --color-chart-2: var(--vibes-chart-2);
+  --color-chart-3: var(--vibes-chart-3);
+  --color-chart-4: var(--vibes-chart-4);
+  --color-chart-5: var(--vibes-chart-5);
+}
+
+@custom-variant dark (&:is(.dark *));

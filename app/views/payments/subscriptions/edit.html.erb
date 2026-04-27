@@ -1,0 +1,126 @@
+<% if @subscription.on_trial? %>
+  <div class="banner banner-warning flex items-center gap-3" role="alert">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5 shrink-0">
+      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+    </svg>
+    <p><%= t(".trial_ends", days: time_ago_in_words(@subscription.trial_ends_at)) %></p>
+  </div>
+<% end %>
+
+<div class="container m-auto py-20 px-4">
+  <!-- Header Section -->
+  <div class="flex flex-wrap justify-center mb-16">
+    <div class="text-center max-w-3xl">
+      <h1 class="text-5xl sm:text-6xl font-bold tracking-tight text-foreground mb-6">
+        Change Your Plan
+      </h1>
+      <p class="text-xl sm:text-2xl text-muted-foreground leading-relaxed font-medium">
+        Choose a plan to continue.
+      </p>
+    </div>
+  </div>
+
+  <!-- All Plans Grid -->
+  <div class="max-w-7xl mx-auto">
+    <% all_plans = (@monthly_plans + @yearly_plans).uniq %>
+    <% if all_plans.any? %>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        <% all_plans.each do |plan| %>
+          <% is_current = @subscription.plan == plan %>
+          <div class="relative bg-card border-card border rounded-2xl shadow-sm transition-all duration-300 <%= is_current ? 'ring-2 ring-primary shadow-lg' : 'hover:shadow-lg hover:border-primary' %>">
+            <!-- Current Plan Badge -->
+            <% if is_current %>
+              <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                <span class="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-muted-foreground text-sm font-semibold rounded-full shadow-lg border-2 border-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                  </svg>
+                  <%= t(".current_plan") %>
+                </span>
+              </div>
+            <% end %>
+
+            <div class="p-6 lg:p-8 <%= is_current ? 'pt-10' : '' %>">
+              <!-- Plan Header -->
+              <div class="mb-6">
+                <h3 class="text-2xl font-bold tracking-tight text-foreground mb-2">
+                  <%= plan.name %>
+                </h3>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-4xl font-bold text-foreground">
+                    <%= pay_amount_to_currency(plan) %>
+                  </span>
+                  <span class="text-base text-muted-foreground font-medium">
+                    / <%= plan_interval(plan) %>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Trial Info -->
+              <% if plan.trial_period? %>
+                <div class="mb-6 p-3 bg-surface-1 rounded-lg">
+                  <div class="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-primary">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                    </svg>
+                    <%= plan.trial_period_days %> days free trial
+                  </div>
+        </div>
+      <% end %>
+
+              <!-- Description -->
+              <% if plan.description.present? %>
+                <p class="mb-6 text-sm leading-relaxed text-muted-foreground">
+                  <%= plan.description %>
+                </p>
+                    <% end %>
+
+              <!-- Features -->
+              <% if plan.features.any? %>
+                <div class="mb-8 space-y-3">
+                  <h4 class="text-sm font-semibold text-foreground mb-3">What's included:</h4>
+                  <% plan.features.take(5).each do |feature| %>
+                    <div class="flex items-start gap-2 text-foreground text-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="shrink-0 mt-0.5 text-primary h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span><%= feature %></span>
+                    </div>
+                  <% end %>
+                  <% if plan.features.length > 5 %>
+                    <div class="text-sm text-muted-foreground italic">
+                      + <%= plan.features.length - 5 %> more features
+                    </div>
+                <% end %>
+                </div>
+              <% end %>
+
+              <!-- Action Button -->
+              <div class="mt-auto">
+                <% if is_current %>
+                  <div class="btn btn-secondary btn-block opacity-60 cursor-not-allowed">
+                    <%= t(".current_plan") %>
+          </div>
+                  <% else %>
+                  <%= form_with url: payments_subscription_url(@subscription), method: :patch, class: "w-full" do |f| %>
+                      <%= f.hidden_field :plan_id, value: plan.to_param %>
+                    <%= f.button t(".change_plan"), 
+                        class: "btn btn-secondary btn-block", 
+                        data: { 
+                          disable_with: t(".processing"), 
+                          turbo_confirm: "Are you sure you want to change to the #{plan.name} plan?" 
+                        } %>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="text-center py-12">
+        <p class="text-xl text-muted-foreground">No plans available at this time.</p>
+    </div>
+    <% end %>
+  </div>
+</div>

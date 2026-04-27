@@ -1,0 +1,253 @@
+#!/bin/bash -e
+
+# Enable jemalloc for reduced memory usage and latency.
+if [ -z "${LD_PRELOAD+x}" ]; then
+    LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
+    export LD_PRELOAD
+fi
+
+# ============================================================================
+# DEPLOYMENT MODE DETECTION
+# ============================================================================
+# USE_MOUNTED_VIBES=true → Vibecoding mode (Fly.io dev cloud with hot reloads)
+# USE_MOUNTED_VIBES unset → Production mode (Render, Kamal, standard deploys)
+# ============================================================================
+
+if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+  # ============================================================================
+  # VIBECODING MODE (Fly.io Development Cloud)
+  # ============================================================================
+  # Volume-mounted code with hot reloads, git-pull deployments, hot bundle installs
+  echo "🚀 Initializing volume-mounted environment..."
+  
+  # Create volume directories (no rov/ - code comes from git!)
+  # Running as root here, so we can ensure proper ownership
+  mkdir -p /mnt/data/code /mnt/data/sqlite /mnt/data/bundle /mnt/data/mailbin
+  
+  # Ensure rails user owns all volume directories
+  echo "🔧 Setting volume ownership to rails user..."
+  chown -R rails:rails /mnt/data/code /mnt/data/sqlite /mnt/data/bundle /mnt/data/mailbin 2>/dev/null || true
+  
+  # Mark bundle as needs seeding (background job will handle it post-boot)
+  if [ ! -f "/mnt/data/bundle/.ready" ]; then
+    echo "⏳ Bundle seeding will happen in background after boot"
+    touch /mnt/data/bundle/.needs_seeding
+  else
+    echo "✅ Volume bundle already ready"
+  fi
+  
+  # ATOMIC COUPLING: Only boot from /mnt/data/code if bundle is ALSO ready
+  # This prevents mixing mounted Gemfile (which may have git gems or different versions)
+  # with image bundle (which was built from image's Gemfile)
+  if [ -d "/mnt/data/code" ] && [ -f "/mnt/data/code/config.ru" ] && [ -f "/mnt/data/bundle/.ready" ]; then
+    echo "🔄 Running from volume code + bundle (hot updates active)"
+    
+    # CRITICAL: Mark repo as safe for root user (Git 2.35.2+ security)
+    # This allows SSH operations and scripts running as root to access the git repo
+    # which is owned by rails user but mounted from volume
+    if [ -d "/mnt/data/code/.git" ]; then
+      git config --global --add safe.directory /mnt/data/code 2>/dev/null || true
+    fi
+    
+    cd /mnt/data/code
+    export RAILS_ROOT=/mnt/data/code
+    export BUNDLE_PATH="/mnt/data/bundle"
+    export GEM_HOME="/mnt/data/bundle"
+    export GEM_PATH="/mnt/data/bundle"
+    export BUNDLE_GEMFILE="/mnt/data/code/Gemfile"
+    export GEL_GEMFILE="/mnt/data/code/Gemfile"
+    
+    # CRITICAL: Ensure tmp directories exist with proper permissions
+    # Git-pulled code doesn't include tmp/ structure (gitignored)
+    # Running as root here, so we can fix permissions
+    echo "📁 Ensuring tmp directories exist with proper ownership..."
+    mkdir -p /mnt/data/code/tmp/pids
+    mkdir -p /mnt/data/code/tmp/cache
+    mkdir -p /mnt/data/code/tmp/sockets
+    mkdir -p /mnt/data/code/log
+    
+    # Ensure rails user owns the volume code directories
+    chown -R rails:rails /mnt/data/code/tmp /mnt/data/code/log 2>/dev/null || true
+  else
+    echo "📦 Running from image (waiting for volumes to be ready)"
+    if [ -d "/mnt/data/code" ] && [ -f "/mnt/data/code/config.ru" ]; then
+      echo "   Code repo ready but bundle still initializing - staying on image until both ready"
+    fi
+    cd /rails
+    export RAILS_ROOT=/rails
+    export BUNDLE_PATH="/usr/local/bundle"
+    export GEM_HOME="/usr/local/bundle"
+    export GEM_PATH="/usr/local/bundle"
+    export BUNDLE_GEMFILE="/rails/Gemfile"
+    export GEL_GEMFILE="/rails/Gemfile"
+  fi
+  
+  echo "✅ Volume environment ready"
+  echo "   Bundle path: ${BUNDLE_PATH}"
+  echo "   Gemfile: ${BUNDLE_GEMFILE}"
+  echo "   Rails root: ${RAILS_ROOT}"
+  echo "   Deployment mode: disabled (hot updates enabled)"
+
+else
+  # ============================================================================
+  # PRODUCTION MODE (Render, Kamal, Standard Deploys)
+  # ============================================================================
+  # Standard Rails deployment from image - no volumes, no hot reloads
+  echo "📦 Production mode (standard deployment)"
+  
+  cd /rails
+  export RAILS_ROOT=/rails
+  export BUNDLE_PATH="/usr/local/bundle"
+  export GEM_HOME="/usr/local/bundle"
+  export GEM_PATH="/usr/local/bundle"
+  export BUNDLE_GEMFILE="/rails/Gemfile"
+  
+  # CRITICAL: Migrate databases from preDeployCommand to persistent disk
+  # During preDeployCommand, disk isn't mounted so databases get created in storage/
+  # At runtime, disk IS mounted so we move them to the sqlite/ subdirectory
+  if [ -n "${RENDER_DISK_PATH}" ] && [ -d "${RENDER_DISK_PATH}" ]; then
+    # Ensure sqlite directory exists
+    mkdir -p "${RENDER_DISK_PATH}/sqlite"
+    
+    # Migrate databases if needed (first deploy)
+    if [ -f "/rails/storage/production.sqlite3" ] && [ ! -f "${RENDER_DISK_PATH}/sqlite/production.sqlite3" ]; then
+      echo "📦 Migrating databases from preDeployCommand to persistent disk..."
+      mv /rails/storage/production.sqlite3 "${RENDER_DISK_PATH}/sqlite/" 2>/dev/null || true
+      mv /rails/storage/production_cache.sqlite3 "${RENDER_DISK_PATH}/sqlite/" 2>/dev/null || true
+      mv /rails/storage/production_queue.sqlite3 "${RENDER_DISK_PATH}/sqlite/" 2>/dev/null || true
+      echo "✅ Databases migrated to persistent disk"
+    fi
+    
+    # CRITICAL: Always fix ownership on every boot (not just first deploy)
+    # preDeployCommand may create new files as root, we need them writable by rails user
+    # This is idempotent and fast (only touches files if ownership needs changing)
+    if [ -d "${RENDER_DISK_PATH}/sqlite" ]; then
+      chown -R rails:rails "${RENDER_DISK_PATH}/sqlite" 2>/dev/null || true
+    fi
+    
+    # Also ensure storage directory ownership is correct for uploads
+    if [ -d "${RENDER_DISK_PATH}/storage" ]; then
+      chown -R rails:rails "${RENDER_DISK_PATH}/storage" 2>/dev/null || true
+    fi
+  fi
+  
+  echo "✅ Production environment ready"
+  echo "   Bundle path: ${BUNDLE_PATH}"
+  echo "   Rails root: ${RAILS_ROOT}"
+  
+  # Database info logged below after initialization
+  if [ -n "${RENDER_DISK_PATH}" ]; then
+    echo "   Database: SQLite on disk (${RENDER_DISK_PATH})"
+  elif [[ "${DATABASE_URL}" =~ ^postgres ]]; then
+    echo "   Database: PostgreSQL"
+  else
+    echo "   Database: SQLite (local)"
+  fi
+fi
+
+# If running the rails server or vibes-server, set up databases (SQLite only)
+if ([ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]) || [ "${@: -1}" == "./bin/vibes-server" ]; then
+  # Skip database setup if using PostgreSQL (database.yml handles it)
+  if ! [[ "${DATABASE_URL}" =~ ^postgres ]]; then
+    # Determine SQLite storage path based on environment
+    if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+      SQLITE_PATH="/mnt/data/sqlite"
+    elif [ -n "${RENDER_DISK_PATH}" ]; then
+      SQLITE_PATH="${RENDER_DISK_PATH}"
+    else
+      # Fallback: local storage/ (Kamal, etc)
+      SQLITE_PATH="/rails/storage"
+    fi
+    
+    echo "🗄️  Checking SQLite databases at ${SQLITE_PATH}..."
+    
+    # FAST PATH: Skip if marker exists (restarts <1s)
+    if [ -f "${SQLITE_PATH}/.db_ready" ]; then
+      echo "⚡ Databases verified ready (fast restart: <1s)"
+    else
+      # First boot: Initialize databases (FLY ONLY - automatic provisioning)
+      # Standard Rails deploys should use preDeployCommand or manual setup
+      if [ "${USE_MOUNTED_VIBES}" = "true" ]; then
+        echo "🚀 First boot: Initializing databases (Fly vibecoding)..."
+        
+        # Ensure directory exists
+        mkdir -p "${SQLITE_PATH}"
+        
+        # ============================================================================
+        # FLY VIBECODING: Use pre-built databases (fast template provisioning)
+        # ============================================================================
+        # Copy pre-built database files from image (built during docker build)
+        # These files already have full schema, no migrations needed
+        # CRITICAL: Templates are ALWAYS in /rails/db/templates/ (image), never on volume
+        if [ -f "/rails/db/templates/production.sqlite3" ]; then
+          echo "📋 Copying 3 pre-built databases (instant setup for Fly)..."
+          cp /rails/db/templates/production.sqlite3 "${SQLITE_PATH}/"
+          cp /rails/db/templates/production_cache.sqlite3 "${SQLITE_PATH}/"
+          cp /rails/db/templates/production_queue.sqlite3 "${SQLITE_PATH}/"
+          
+          # Set proper permissions for Fly volumes
+          chown -R rails:rails "${SQLITE_PATH}" 2>/dev/null || true
+          
+          # Create marker for fast restarts
+          touch "${SQLITE_PATH}/.db_ready"
+          echo "✅ Databases ready instantly (no migrations needed)"
+        else
+          # Fallback: Templates missing from image (shouldn't happen)
+          echo "⚠️ Database templates not found in image"
+          echo "   EnsureSqliteDatabasesJob will set up databases via SSH"
+        fi
+      else
+        # ============================================================================
+        # VANILLA RAILS: No automatic setup (developer responsibility)
+        # ============================================================================
+        # For Render/Kamal/etc, developers should:
+        # - Set preDeployCommand in render.yaml: "bundle exec rails db:schema:load"
+        # - Or run manually: "render shell myapp && bundle exec rails db:prepare"
+        # - Or let Rails create databases on first request
+        #
+        # We don't auto-run schema:load because:
+        # 1. Not vanilla Rails pattern (migrations/setup are deploy-time, not runtime)
+        # 2. Might fail if SECRET_KEY_BASE missing (blocking container start)
+        # 3. Developers expect explicit control over database setup
+        echo "💡 Database setup required (vanilla Rails deploy)"
+        echo "   Run manually: bundle exec rails db:prepare"
+        echo "   Or configure preDeployCommand in render.yaml"
+        echo "   Or Rails will create databases on first request"
+      fi
+    fi
+  else
+    echo "🐘 Using PostgreSQL (database.yml configuration)"
+  fi
+fi
+
+# If running jobs, check database status (for future if separate worker process added)
+if [ "${1}" == "./bin/jobs" ]; then
+  if [ -f "/mnt/data/sqlite/.ready" ]; then
+    echo "⚡ Job worker: Databases ready"
+  else
+    echo "⏳ Job worker: Databases not ready yet (will retry)"
+  fi
+fi
+
+# CRITICAL: Always use /rails/bin/ scripts (image) even when code is on volume
+# Volume code from git-pull won't have proper execute permissions
+# Replace volume bin path with image bin path in arguments
+if [ "${USE_MOUNTED_VIBES}" = "true" ] && [ -d "/mnt/data/code" ]; then
+  # Running from volume code, but use image bin scripts
+  FIXED_ARGS=()
+  for arg in "$@"; do
+    # Replace /mnt/data/code/bin/ with /rails/bin/
+    FIXED_ARG="${arg//\/mnt\/data\/code\/bin\//\/rails\/bin\/}"
+    # Also handle relative ./bin/ paths
+    FIXED_ARG="${FIXED_ARG//\.\/bin\//\/rails\/bin\/}"
+    FIXED_ARGS+=("$FIXED_ARG")
+  done
+  
+  # Drop from root to rails user before starting app (security best practice)
+  # gosu is like sudo but for Docker - allows root to do setup, then drop privileges
+  exec gosu rails "${FIXED_ARGS[@]}"
+else
+  # Standard mode or image mode - use args as-is
+  # Drop to rails user for security
+  exec gosu rails "${@}"
+fi

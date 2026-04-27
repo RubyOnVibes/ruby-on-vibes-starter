@@ -1,0 +1,74 @@
+<%# Terms of Service - placeholder page, AI can customize with app-specific details %>
+
+<% content_for :title do %>
+  Terms of Service — <%= RubyOnVibes.application_name %>
+<% end %>
+
+<div class="container m-auto py-16 px-4 max-w-3xl">
+  <h1 class="text-4xl font-bold tracking-tight text-foreground mb-8">Terms of Service</h1>
+
+  <div class="prose prose-lg text-muted-foreground space-y-6">
+    <p class="text-sm text-muted-foreground">Last updated: <%= Date.today.strftime("%B %d, %Y") %></p>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Agreement to Terms</h2>
+      <p>
+        By accessing or using <%= RubyOnVibes.application_name %>, you agree to be bound by these Terms of Service.
+        If you do not agree to these terms, please do not use our service.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Use of Service</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>You must be at least 13 years old to use this service.</li>
+        <li>You are responsible for maintaining the security of your account.</li>
+        <li>You agree not to use the service for any unlawful purpose.</li>
+        <li>You agree not to interfere with or disrupt the service.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Accounts</h2>
+      <p>
+        When you create an account, you must provide accurate and complete information.
+        You are responsible for all activity that occurs under your account.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Intellectual Property</h2>
+      <p>
+        The service and its original content, features, and functionality are owned by
+        <%= RubyOnVibes.application_name %> and are protected by applicable intellectual property laws.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Limitation of Liability</h2>
+      <p>
+        The service is provided "as is" without warranties of any kind. We shall not be liable
+        for any indirect, incidental, special, or consequential damages arising from your use of the service.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Changes to Terms</h2>
+      <p>
+        We reserve the right to modify these terms at any time. We will notify users of any material changes
+        by posting the updated terms on this page.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold text-foreground mt-10 mb-4">Contact Us</h2>
+      <p>
+        If you have any questions about these Terms of Service, please contact us through our application.
+      </p>
+    </section>
+  </div>
+
+  <div class="mt-12 pt-8 border-t border-border">
+    <%= link_to "← Back to Home", root_path, class: "text-sm font-medium text-primary hover:underline" %>
+  </div>
+</div>

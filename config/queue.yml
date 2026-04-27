@@ -1,0 +1,24 @@
+# SolidQueue configuration optimized for 2GB shared CPU Fly machines
+# Works great out-of-the-box, all settings overridable via SOLID_QUEUE_* ENV vars
+#
+# Default: 1 dispatcher + 1 worker pool (2 threads × 1 process = 2 concurrent jobs)
+# Memory footprint: ~200MB (safe for 2GB machines with Rails + Redis + bundle operations)
+default: &default
+  dispatchers:
+    - polling_interval: <%= ENV.fetch("SOLID_QUEUE_DISPATCHER_POLLING_INTERVAL", 1) %>
+      batch_size: <%= ENV.fetch("SOLID_QUEUE_DISPATCHER_BATCH_SIZE", 500) %>
+      concurrency_maintenance_interval: <%= ENV.fetch("SOLID_QUEUE_CONCURRENCY_MAINTENANCE_INTERVAL", 300) %>
+  workers:
+    - queues: <%= ENV.fetch("SOLID_QUEUE_QUEUES", '"*"') %>
+      threads: <%= ENV.fetch("SOLID_QUEUE_THREADS", 2) %>
+      processes: <%= ENV.fetch("SOLID_QUEUE_PROCESSES", 1) %>
+      polling_interval: <%= ENV.fetch("SOLID_QUEUE_WORKER_POLLING_INTERVAL", 0.1) %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

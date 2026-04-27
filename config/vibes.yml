@@ -1,0 +1,33 @@
+# Ruby on Vibes Configuration
+# Configure your app/business identity here
+#
+# IMPORTANT: This is the ONLY file you should edit to change app/business info
+# - Backend access: RubyOnVibes.application_name, RubyOnVibes.business_name, etc
+# - Frontend access: window.App.data().name, window.App.data().businessName, etc
+# - NEVER hardcode these values in Ruby/ERB/JS/TS files - always read from this config
+
+application_name: "My App"
+
+business_name: "My Company, LLC"
+
+business_address: "123 My Street, Anywhere, Universe, 12345"
+
+# Delete [] and uncomment the '- stripe' line to use Stripe
+payment_processors:
+  # - stripe
+
+# Enable teams to allow multi-member workspaces
+teams: true
+
+# Enable referrals to support user-referred signups (referral codes)
+referrals: false
+
+# Enable dashboard page (default: true)
+# Set to false to disable the /dashboard route and remove from settings nav
+dashboard: true
+
+# Optional settings (uncomment to use)
+# support_phone: "+1 (555) 555-5555"
+# mailer_host: "mail.example.com"
+# support_email: "support@example.com"
+# default_from_email: "no-reply@example.com"

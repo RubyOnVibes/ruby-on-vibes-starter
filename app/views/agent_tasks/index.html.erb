@@ -1,0 +1,117 @@
+<% content_for(:title, 'Agent Tasks') %>
+
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-3xl">
+      <!-- Header (hidden on mobile where navbar dropdown shows title) -->
+      <div class="hidden lg:block mb-10">
+        <h1 class="text-2xl font-semibold text-foreground tracking-tight">Agent Tasks</h1>
+        <p class="text-sm mt-1" style="color: var(--color-muted-foreground);">
+          Background tasks triggered through chat.
+        </p>
+      </div>
+
+      <%# Status filter tabs %>
+      <div class="flex gap-2 mb-6 flex-wrap">
+        <% statuses = [["All", "all"], ["Running", "running"], ["Completed", "completed"], ["Failed", "failed"], ["Cancelled", "cancelled"]] %>
+        <% current_status = params[:status] || "all" %>
+        <% statuses.each do |label, value| %>
+          <% count = value == "all" ? @status_counts.values.sum : (@status_counts[value] || @status_counts[AgentTask.statuses[value]] || 0) %>
+          <%= link_to agent_tasks_path(status: value),
+                class: "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors #{current_status == value ? 'border-current' : ''}",
+                style: "color: var(--color-#{current_status == value ? 'foreground' : 'muted-foreground'}); border-color: var(--color-border); background-color: var(--color-#{current_status == value ? 'surface-2' : 'surface-1'});" do %>
+            <%= label %> (<%= count %>)
+          <% end %>
+        <% end %>
+      </div>
+
+      <% if @agent_tasks.any? %>
+        <div class="border rounded-lg overflow-hidden" style="border-color: var(--color-border);">
+          <table class="w-full text-sm">
+            <thead>
+              <tr style="background-color: var(--color-surface-1); color: var(--color-muted-foreground);">
+                <th class="text-left px-4 py-3 font-medium">Task</th>
+                <th class="text-left px-4 py-3 font-medium">Status</th>
+                <th class="text-left px-4 py-3 font-medium hidden sm:table-cell">Progress</th>
+                <th class="text-left px-4 py-3 font-medium hidden md:table-cell">Chat</th>
+                <th class="text-left px-4 py-3 font-medium hidden lg:table-cell">Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @agent_tasks.each do |task| %>
+                <tr class="border-t hover:bg-[var(--color-surface-1)] transition-colors cursor-pointer"
+                    style="border-color: var(--color-border);"
+                    onclick="window.location='<%= agent_task_path(task) %>'">
+                  <td class="px-4 py-3">
+                    <div class="font-medium" style="color: var(--color-foreground);">
+                      <%= link_to task.kind.humanize, agent_task_path(task), style: "color: inherit; text-decoration: none;" %>
+                    </div>
+                    <div class="text-xs font-mono" style="color: var(--color-muted-foreground);">
+                      <%= task.to_param %>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full"
+                          style="background-color: var(--color-surface-2); color: var(--color-<%= task.status_completed? ? 'success' : task.status_failed? ? 'danger' : 'foreground' %>, var(--color-foreground));">
+                      <% if task.active? %>
+                        <span class="w-1.5 h-1.5 rounded-full animate-pulse" style="background-color: var(--color-primary);"></span>
+                      <% end %>
+                      <%= task.status.humanize %>
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 hidden sm:table-cell" style="color: var(--color-muted-foreground);">
+                    <% if task.active? %>
+                      <div class="flex items-center gap-2">
+                        <div class="flex-1 h-1.5 rounded-full" style="background-color: var(--color-border);">
+                          <div class="h-full rounded-full" style="width: <%= task.progress %>%; background-color: var(--color-primary);"></div>
+                        </div>
+                        <span class="text-xs"><%= task.progress %>%</span>
+                      </div>
+                    <% else %>
+                      <%= task.progress_text&.truncate(40) || "#{task.progress}%" %>
+                    <% end %>
+                  </td>
+                  <td class="px-4 py-3 hidden md:table-cell">
+                    <%= link_to task.chat.mentionable_label.truncate(25),
+                          chat_path(task.chat),
+                          class: "text-xs hover:underline",
+                          style: "color: var(--color-primary);",
+                          onclick: "event.stopPropagation();" %>
+                  </td>
+                  <td class="px-4 py-3 hidden lg:table-cell text-xs" style="color: var(--color-muted-foreground);">
+                    <% if task.started_at %>
+                      <%= time_ago_in_words(task.started_at) %> ago
+                    <% else %>
+                      Queued
+                    <% end %>
+                  </td>
+                </tr>
+                <% if task.status_failed? && @can_view_errors && task.error_message.present? %>
+                  <tr class="border-t" style="border-color: var(--color-border);">
+                    <td colspan="5" class="px-4 py-2">
+                      <div class="text-xs font-mono rounded px-3 py-2 border" style="color: var(--color-danger); background-color: var(--color-surface-1); border-color: var(--color-danger);">
+                        <span class="font-sans font-medium">Error:</span> <%= task.error_message.truncate(200) %>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+        <%# Pagination %>
+        <div class="mt-6">
+          <%= render "pagination", pagy: @pagy %>
+        </div>
+      <% else %>
+        <div class="text-center py-16" style="color: var(--color-muted-foreground);">
+          <p class="text-sm">No agent tasks yet.</p>
+          <p class="text-xs mt-1">Tasks will appear here when triggered through chat.</p>
+        </div>
+      <% end %>
+    </div>
+  </main>
+</div>

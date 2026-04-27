@@ -1,0 +1,25 @@
+<div>
+  <h1>AdminDashboard</h1>
+
+  <div>
+    <p>To customize this dashboard, edit <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px;">app/views/madmin/dashboard/show.html.erb</code>.</p>
+  </div>
+
+  <div>
+    <p style="font-weight: bold;">Users: <%= User.count %></p>
+  </div>
+
+  <% if RubyOnVibes.teams? %>
+    <div>
+      <p style="font-weight: bold;">Workspaces: <%= Workspace.count %></p>
+    </div>
+  <% end %>
+
+  <% if RubyOnVibes.llm? %>
+    <div>
+      <p style="font-weight: bold;">LLMs: <%= Model.count %></p>
+    </div>
+
+    <%= button_to "Refresh LLMs", "admin/refresh_models", method: :post, class: "btn" %>
+  <% end %>
+</div>

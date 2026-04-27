@@ -1,0 +1,32 @@
+<div class="mb-8">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Billing History</h2>
+
+  <% if (charges = current_workspace.pay_charges.sorted) && charges.any? %>
+    <div class="space-y-3">
+        <% charges.each do |charge| %>
+        <div class="group py-4 border-b border-border hover:bg-surface-1 transition-colors -mx-4 px-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="text-foreground font-medium text-base mb-0.5"><%= pay_amount_to_currency(charge) %></div>
+              <div class="text-muted-foreground text-sm"><%= charge.created_at.strftime("%B %e, %Y") %></div>
+            </div>
+            <div class="flex items-center gap-4 flex-shrink-0">
+              <%= link_to invoice_payments_charge_path(charge, format: :pdf), target: :_blank, class: "inline-flex items-center gap-2 opacity-60 hover:opacity-100 text-foreground transition-opacity text-sm", title: "Download Invoice" do %>
+                <%= invoice_icon(class: "w-5 h-5") %>
+                <span class="hidden sm:inline">Invoice</span>
+              <% end %>
+              <%= link_to payments_charge_path(charge, format: :pdf), target: :_blank, class: "inline-flex items-center gap-2 opacity-60 hover:opacity-100 text-foreground transition-opacity text-sm", title: "Download Receipt" do %>
+                <%= receipt_icon(class: "w-5 h-5") %>
+                <span class="hidden sm:inline">Receipt</span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+        <% end %>
+    </div>
+  <% else %>
+    <div class="text-muted-foreground text-sm">
+      No billing history.
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,35 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <!-- Main content -->
+  <main class="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-12 lg:py-6">
+    <div class="max-w-2xl">
+      <!-- Breadcrumb -->
+      <div class="flex items-center gap-2 mb-3">
+        <%= link_to "Billing Plan", payments_path, class: "v-link-muted text-sm" %>
+        <%= chevron_right_icon(class: "w-4 h-4 text-muted-foreground") %>
+        <span class="text-sm text-muted-foreground"><%= t ".title" %></span>
+      </div>
+
+      <h1 class="v-page-heading text-foreground mb-6">Resume Subscription</h1>
+
+      <!-- Subscription Summary -->
+      <div class="mb-6">
+        <div class="text-lg font-semibold text-foreground mb-1"><%= @subscription.plan&.name || @subscription.name %></div>
+        <% unless @subscription.plan.nil? %>
+          <div class="text-base text-foreground mb-4">
+            <%= pay_amount_to_currency(@subscription) %> / <%= plan_interval(@subscription.plan) %>
+          </div>
+        <% end %>
+        <p class="text-muted-foreground">Your subscription will resume immediately and you'll be charged at the next billing cycle.</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center pt-6 border-t border-border">
+        <%= link_to "Back", payments_path, class: "btn btn-secondary w-full sm:w-auto" %>
+
+        <%= button_to "Resume Subscription", unpause_payments_subscription_path(@subscription), method: :patch, class: "btn btn-primary w-full sm:w-auto", data: { turbo_confirm: "Are you sure you want to resume your subscription?" } %>
+      </div>
+    </div>
+  </main>
+</div>

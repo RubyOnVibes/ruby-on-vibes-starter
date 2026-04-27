@@ -1,0 +1,454 @@
+<script>
+/**
+ * Vibes Iframe Bridge
+ * Tracks navigation, console logs, errors, network, and interactions in iframe
+ * 
+ * Framework Support:
+ * - Turbo: Full support with [turbo:before-visit] and [turbo:load] events
+ * - SPAs (React Router, Inertia+React, Vue): Tracked as [initial] and [popstate]
+ * - Vanilla JS: Tracked as [initial]
+ * 
+ * All tracking enabled by default. To disable a feature, comment out the section:
+ * - Navigation tracking: Lines 57-138
+ * - Click tracking: Lines 141-158
+ * - Error tracking: Lines 161-180
+ * - Console capture (with file/line): Lines 183-242
+ * - Network interception (fetch + XHR): Lines 245-379
+ */
+(function() {
+  'use strict';
+
+  // Only run if we're in an iframe
+  if (window.self === window.top) {
+    return;
+  }
+
+  const parentOrigin = '*'; // Safe: we control both parent and iframe
+  let lastUrl = '';
+
+  // Helper: Extract file/line from stack trace
+  function parseStackTrace(stack) {
+    if (!stack) return null;
+    
+    // Stack format: "Error\n    at functionName (https://app.fly.dev/file.js:123:45)"
+    const lines = stack.split('\n');
+    // Line 0: "Error"
+    // Line 1: "at interceptConsole (bridge:123)" <- our wrapper
+    // Line 2: "at actualCallerFunction (app.js:456)" <- what we want!
+    const callerLine = lines[2] || lines[1] || '';
+    
+    // Extract: (https://domain.com/path/file.js:123:45) or (file.js:123:45)
+    const match = callerLine.match(/\((.+):(\d+):(\d+)\)|at (.+):(\d+):(\d+)/);
+    if (match) {
+      const file = match[1] || match[4] || 'unknown';
+      const line = match[2] || match[5] || '?';
+      const col = match[3] || match[6] || '?';
+      
+      // Strip full URL to just filename
+      const filename = file.split('/').pop() || file;
+      
+      return {
+        file: filename,
+        line: parseInt(line),
+        column: parseInt(col),
+        fullPath: file
+      };
+    }
+    return null;
+  }
+
+  // ============================================================================
+  // NAVIGATION TRACKING (Turbo + Inertia compatible)
+  // ============================================================================
+
+  let navigationStartTime = null;
+  let navigationSource = null; // Track which event triggered navigation
+
+  function postNavigationStart(url, source) {
+    navigationStartTime = Date.now();
+    navigationSource = source;
+    try {
+      window.parent.postMessage({
+        type: 'vibes:iframe:navigation:start',
+        url: url || window.location.href,
+        pathname: new URL(url || window.location.href, window.location.origin).pathname,
+        source: source, // Preserve original event type
+        timestamp: new Date().toISOString()
+      }, parentOrigin);
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  function postNavigationComplete(source) {
+    const currentUrl = window.location.href;
+    
+    // Allow framework events to override fallback 'initial' event
+    const isFrameworkEvent = source && (source.includes('turbo') || source.includes('inertia') || source === 'popstate');
+    
+    // Skip if we've already tracked this URL, UNLESS it's a framework event overriding 'initial'
+    if (currentUrl === lastUrl && !isFrameworkEvent) return;
+    
+    lastUrl = currentUrl;
+    
+    const duration = navigationStartTime ? Date.now() - navigationStartTime : null;
+    const startSource = navigationSource;
+    navigationStartTime = null;
+    navigationSource = null;
+    
+    try {
+      window.parent.postMessage({
+        type: 'vibes:iframe:navigation:complete',
+        url: currentUrl,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+        duration: duration,
+        source: source, // Preserve original event type
+        startSource: startSource, // What triggered the navigation
+        timestamp: new Date().toISOString()
+      }, parentOrigin);
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  // Turbo navigation - fires on initial load AND subsequent navigations
+  let turboLoadFired = false;
+  
+  document.addEventListener('turbo:before-visit', (e) => {
+    postNavigationStart(e.detail?.url, 'turbo:before-visit');
+  });
+  
+  document.addEventListener('turbo:load', () => {
+    turboLoadFired = true;
+    postNavigationComplete('turbo:load');
+  });
+
+  // Popstate (back/forward button) - works with all frameworks including SPAs
+  window.addEventListener('popstate', () => {
+    postNavigationStart(window.location.href, 'popstate');
+    setTimeout(() => postNavigationComplete('popstate'), 100);
+  });
+
+  // Fallback for SPAs (React Router, Vue Router, vanilla JS)
+  // If Turbo doesn't fire within 2 seconds, track as SPA navigation
+  // Note: Inertia + React Router apps will show [initial] or [popstate] - this is correct!
+  setTimeout(() => {
+    if (!turboLoadFired && !lastUrl) {
+      postNavigationComplete('initial');
+    }
+  }, 2000);
+
+  // ============================================================================
+  // CLICK TRACKING
+  // ============================================================================
+
+    document.addEventListener('click', function(e) {
+      try {
+        window.parent.postMessage({
+          type: 'vibes:iframe:interaction',
+          interaction: {
+            type: 'click',
+            element: e.target.tagName,
+            text: e.target.textContent?.slice(0, 50),
+            classes: e.target.className,
+            id: e.target.id,
+            timestamp: new Date().toISOString()
+          }
+        }, parentOrigin);
+      } catch (error) {
+      // Silent fail
+      }
+    });
+
+  // ============================================================================
+  // ERROR TRACKING
+  // ============================================================================
+
+    window.addEventListener('error', function(event) {
+      try {
+        window.parent.postMessage({
+          type: 'vibes:iframe:error',
+          error: {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            stack: event.error?.stack,
+            timestamp: new Date().toISOString()
+          }
+        }, parentOrigin);
+      } catch (error) {
+      // Silent fail
+      }
+    });
+
+  // ============================================================================
+  // CONSOLE CAPTURE (with file/line metadata)
+  // ============================================================================
+
+  // Store original console methods BEFORE we override them
+  const _originalLog = console.log;
+  const _originalInfo = console.info;
+  const _originalWarn = console.warn;
+  const _originalError = console.error;
+  const _originalDebug = console.debug;
+
+  function interceptConsole(originalFn, level) {
+      return function(...args) {
+      // CRITICAL: Call original first (so logs still appear in browser console)
+        originalFn.apply(console, args);
+      
+        try {
+        // Get stack trace to extract file/line where console was called
+        const stackInfo = parseStackTrace(new Error().stack);
+        
+        // Convert args to string
+          const message = args.map(arg => {
+            if (typeof arg === 'string') return arg;
+          if (arg instanceof Error) return `${arg.message}\n${arg.stack}`;
+          try { 
+            return JSON.stringify(arg, null, 2); 
+          } catch { 
+            return String(arg); 
+          }
+          }).join(' ');
+
+        // Send to parent
+          window.parent.postMessage({
+            type: 'vibes:iframe:console',
+            console: {
+              level: level,
+            message: message.slice(0, 2000), // Increased limit
+              timestamp: new Date().toISOString(),
+            url: window.location.href,
+            source: stackInfo ? `${stackInfo.file}:${stackInfo.line}:${stackInfo.column}` : null,
+            file: stackInfo?.file,
+            line: stackInfo?.line,
+            column: stackInfo?.column
+          }
+        }, parentOrigin);
+      } catch (error) {
+        // Use original console to report failure (won't cause infinite loop)
+        _originalError('[Vibes Bridge] Failed to send console.' + level + ':', error);
+      }
+    };
+  }
+
+  // Override console methods
+  console.log = interceptConsole(_originalLog, 'log');
+  console.info = interceptConsole(_originalInfo, 'info');
+  console.warn = interceptConsole(_originalWarn, 'warn');
+  console.error = interceptConsole(_originalError, 'error');
+  console.debug = interceptConsole(_originalDebug, 'debug');
+
+  // ============================================================================
+  // NETWORK INTERCEPTION (fetch + XMLHttpRequest)
+  // Defensive: If anything fails, original fetch/XHR still works
+  // ============================================================================
+
+  // Helper: Generate correlation ID for tracking
+  function generateCorrelationId() {
+    return 'client_' + Math.random().toString(36).substring(2, 15);
+  }
+
+  // Intercept fetch
+  if (window.fetch) {
+    const _originalFetch = window.fetch;
+    window.fetch = function(...args) {
+      const startTime = Date.now();
+      const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || 'unknown';
+      const method = args[1]?.method || 'GET';
+      const correlationId = generateCorrelationId(); // Client-side tracking
+      
+      return _originalFetch.apply(this, args)
+        .then(response => {
+          const duration = Date.now() - startTime;
+          
+          try {
+            // Capture Rails request ID for backend correlation (if available)
+            // X-Vibes-Request-ID = authoritative Rails UUID (matches backend logs/exceptions)
+            // X-Request-ID = Fly proxy ID (may differ from Rails internal ID)
+            // Fall back to client-side correlation ID for external APIs
+            const vibesRequestId = response.headers.get('X-Vibes-Request-ID');
+            const flyRequestId = response.headers.get('X-Request-ID') || 
+                                 response.headers.get('X-Request-Id');
+            const requestId = vibesRequestId || flyRequestId || correlationId;
+            
+            window.parent.postMessage({
+              type: 'vibes:iframe:network',
+              network: {
+                url: url,
+                method: method,
+                status: response.status,
+                statusText: response.statusText,
+                duration: duration,
+                ok: response.ok,
+                requestId: requestId, // Vibes ID (authoritative) → Fly ID → client ID
+                hasBackendId: !!vibesRequestId, // True if we got Rails UUID
+                timestamp: new Date().toISOString()
+              }
+            }, parentOrigin);
+          } catch (error) {
+            // Silent fail - don't break the fetch
+          }
+          
+          return response;
+        })
+        .catch(error => {
+          const duration = Date.now() - startTime;
+          
+          try {
+            window.parent.postMessage({
+              type: 'vibes:iframe:network',
+              network: {
+                url: url,
+                method: method,
+                status: 0,
+                statusText: 'Network Error',
+                error: error.message,
+                duration: duration,
+                ok: false,
+                requestId: correlationId, // Client-side ID (no backend response)
+                hasBackendId: false,
+                timestamp: new Date().toISOString()
+              }
+            }, parentOrigin);
+          } catch (postError) {
+            // Silent fail
+          }
+          
+          throw error; // Re-throw so app code can handle it
+        });
+    };
+  }
+
+  // Intercept XMLHttpRequest
+  if (window.XMLHttpRequest) {
+    const _OriginalXHR = window.XMLHttpRequest;
+    window.XMLHttpRequest = function() {
+      const xhr = new _OriginalXHR();
+      const startTime = Date.now();
+      const correlationId = generateCorrelationId(); // Client-side tracking
+      let method = '';
+      let url = '';
+      
+      // Intercept open() to capture method and URL
+      const _originalOpen = xhr.open;
+      xhr.open = function(m, u, ...args) {
+        method = m;
+        url = u;
+        return _originalOpen.apply(this, [m, u, ...args]);
+      };
+      
+      // Intercept load event to capture success
+      xhr.addEventListener('load', function() {
+        const duration = Date.now() - startTime;
+        try {
+          // Capture Rails request ID for backend correlation (if available)
+          const vibesRequestId = xhr.getResponseHeader('X-Vibes-Request-ID');
+          const flyRequestId = xhr.getResponseHeader('X-Request-ID') || 
+                               xhr.getResponseHeader('X-Request-Id');
+          const requestId = vibesRequestId || flyRequestId || correlationId;
+          
+          window.parent.postMessage({
+            type: 'vibes:iframe:network',
+            network: {
+              url: url,
+              method: method,
+              status: xhr.status,
+              statusText: xhr.statusText,
+              duration: duration,
+              ok: xhr.status >= 200 && xhr.status < 300,
+              requestId: requestId, // Vibes ID (authoritative) → Fly ID → client ID
+              hasBackendId: !!vibesRequestId,
+              timestamp: new Date().toISOString()
+            }
+          }, parentOrigin);
+        } catch (error) {
+          // Silent fail
+        }
+      });
+      
+      // Intercept error event to capture failures
+      xhr.addEventListener('error', function() {
+        const duration = Date.now() - startTime;
+        try {
+          window.parent.postMessage({
+            type: 'vibes:iframe:network',
+            network: {
+              url: url,
+              method: method,
+              status: 0,
+              statusText: 'Network Error',
+              error: 'XMLHttpRequest failed',
+              duration: duration,
+              ok: false,
+              requestId: correlationId, // Client-side ID (no backend response)
+              hasBackendId: false,
+              timestamp: new Date().toISOString()
+            }
+          }, parentOrigin);
+        } catch (error) {
+          // Silent fail
+        }
+      });
+      
+      return xhr;
+    };
+    
+    // Copy static properties
+    Object.setPrototypeOf(window.XMLHttpRequest, _OriginalXHR);
+    window.XMLHttpRequest.prototype = _OriginalXHR.prototype;
+  }
+
+  // ============================================================================
+  // API FOR USER APPS
+  // ============================================================================
+
+  window.VibesBridge = {
+    // Send custom events
+    send: function(eventName, data) {
+      try {
+        window.parent.postMessage({
+          type: 'vibes:iframe:custom',
+          eventName: eventName,
+          data: data,
+          timestamp: new Date().toISOString(),
+          url: window.location.href
+        }, parentOrigin);
+      } catch (error) {
+        _originalError('[Vibes Bridge] Failed to send custom message:', error);
+        }
+    },
+    
+    // Trigger test logs and network calls (for debugging)
+    test: function() {
+      console.log('🧪 Test log message from VibesBridge.test()');
+      console.info('🧪 Test info message');
+      console.warn('🧪 Test warning message');
+      console.error('🧪 Test error message');
+      console.debug('🧪 Test debug message');
+      
+      // Test network interception
+      console.log('🧪 Testing network interception...');
+      
+      // Test successful fetch
+      fetch(window.location.origin + '/health', { method: 'GET' })
+        .then(() => console.log('🧪 Network test: GET /health completed'))
+        .catch(() => console.log('🧪 Network test: GET /health failed (expected if endpoint missing)'));
+      
+      // Test failed fetch (should trigger network error)
+      fetch('https://httpbin.org/status/404')
+        .then(() => console.log('🧪 Network test: 404 request completed'))
+        .catch(() => console.log('🧪 Network test: 404 request failed'));
+      
+      return 'Check DevConsole for console logs and network events!';
+    }
+  };
+
+  // Signal that bridge is ready (only visible in browser console, filtered from DevConsole)
+  console.log('[Vibes Bridge] Initialized - all tracking enabled');
+})();
+</script>

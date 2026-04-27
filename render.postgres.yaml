@@ -1,0 +1,76 @@
+# Render.com deployment config - PostgreSQL (Production-ready)
+# See docs/render-postgres.md for setup instructions
+#
+# Replace every occurrence of REPLACE_ME with your app's name. The
+# `fromDatabase.name` references must match the `databases[].name` value.
+
+# Managed PostgreSQL database - you may alternatively use Supabase
+databases:
+  - name: REPLACE_ME-db
+    plan: basic-256mb
+    region: oregon
+
+services:
+  # Web server (can scale to multiple instances)
+  - type: web
+    runtime: docker
+    name: REPLACE_ME-web
+    plan: starter
+    region: oregon
+    numInstances: 2  # Horizontal scaling!
+    
+    dockerfilePath: ./Dockerfile
+    
+    # Run migrations before deploying
+    preDeployCommand: bundle exec rails db:prepare
+    
+    healthCheckPath: /up
+    
+    envVars:
+      # Database connection (automatically set from database)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: REPLACE_ME-db
+          property: connectionString
+      
+      # Also set BLAZER_DATABASE_URL for admin dashboard
+      - key: BLAZER_DATABASE_URL
+        fromDatabase:
+          name: REPLACE_ME-db
+          property: connectionString
+      
+      # Rails secrets
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      
+      - key: RAILS_ENV
+        value: production
+      
+      - key: RAILS_SERVE_STATIC_FILES
+        value: true
+      
+      - key: RAILS_LOG_TO_STDOUT
+        value: true
+  
+  # Background job worker (SolidQueue)
+  # Runs separately from web for better resource isolation
+  - type: worker
+    runtime: docker
+    name: REPLACE_ME-worker
+    plan: starter
+    region: oregon
+    
+    dockerfilePath: ./Dockerfile
+    dockerCommand: bundle exec rake solid_queue:start
+    
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: REPLACE_ME-db
+          property: connectionString
+      
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      
+      - key: RAILS_ENV
+        value: production

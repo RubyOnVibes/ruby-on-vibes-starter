@@ -1,0 +1,23 @@
+<%
+  pricing = field.value(record)
+  if pricing.present?
+    text = pricing.dig("text_tokens", "standard")
+    input_price = text&.dig("input_per_million")
+    output_price = text&.dig("output_per_million")
+%>
+  <% if input_price || output_price %>
+    <span class="pricing-summary" title="Per million tokens (input/output)">
+      <% if input_price && output_price %>
+        <span class="text-muted-foreground">$<%= number_with_precision(input_price, precision: input_price < 0.01 ? 4 : 2, strip_insignificant_zeros: true) %></span>
+        <span class="text-muted-foreground">/</span>
+        <span class="text-foreground font-medium">$<%= number_with_precision(output_price, precision: output_price < 0.01 ? 4 : 2, strip_insignificant_zeros: true) %></span>
+      <% elsif input_price %>
+        <span class="text-muted-foreground">$<%= number_with_precision(input_price, precision: input_price < 0.01 ? 4 : 2, strip_insignificant_zeros: true) %> in</span>
+      <% end %>
+    </span>
+  <% else %>
+    <span class="text-muted-foreground">—</span>
+  <% end %>
+<% else %>
+  <span class="text-muted-foreground">—</span>
+<% end %>

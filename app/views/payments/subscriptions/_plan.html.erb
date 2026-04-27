@@ -1,0 +1,41 @@
+<div class="lg:w-1/3 w-full p-10 bg-card border-card border hover:border-primary m-4 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+  <!-- Plan Name -->
+  <h4 class="mb-8 text-2xl font-semibold tracking-tight text-foreground"><%= plan.name %></h4>
+
+  <!-- Price -->
+  <div class="mb-8 pb-8 border-b border-border">
+    <% if plan.contact_url? %>
+      <span class="text-5xl font-bold tracking-tight text-foreground"><%= t(".contact_us_price") %></span>
+    <% else %>
+      <div class="flex items-baseline gap-2">
+        <span class="text-5xl font-bold tracking-tight text-foreground"><%= pay_amount_to_currency(plan, strip_insignificant_zeros: true) %></span>
+        <span class="text-lg text-muted-foreground font-medium">
+          <% if plan.unit_label? %>/ <%= plan.unit_label %><% end %>
+          / <%= plan_interval(plan) %>
+        </span>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Description -->
+  <% if plan.description.present? %>
+    <p class="mb-8 text-base leading-relaxed text-muted-foreground">
+      <%= plan.description %>
+    </p>
+  <% end %>
+
+  <!-- Features -->
+  <div class="mb-10 space-y-4">
+    <% plan.features.each do |plan_feature| %>
+      <div class="flex items-start gap-3 text-foreground">
+        <svg xmlns="http://www.w3.org/2000/svg" class="shrink-0 mt-0.5 text-primary h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        <div class="text-base"><%= plan_feature %></div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Yield for custom actions at the bottom %>
+  <%= yield %>
+</div>

@@ -1,0 +1,92 @@
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <%= render "application/settings_sidebar" %>
+
+  <main class="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-16 lg:py-12">
+    <div class="max-w-xl">
+      <!-- Header (hidden on mobile where navbar dropdown shows title) -->
+      <div class="hidden lg:block mb-10">
+        <h1 class="text-2xl font-semibold text-foreground tracking-tight">Referrals</h1>
+        <p class="text-muted-foreground mt-1">Invite others and track your progress</p>
+      </div>
+
+      <!-- Statistics -->
+      <div class="mb-10">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-6">Stats</h2>
+        
+        <div class="flex items-baseline gap-8">
+          <div>
+            <span class="text-lg font-semibold text-foreground tabular-nums"><%= number_with_delimiter(current_user.primary_referral_code.visits_count) %></span>
+            <span class="text-sm text-muted-foreground ml-1">clicks</span>
+          </div>
+          
+          <div>
+            <span class="text-lg font-semibold text-foreground tabular-nums"><%= number_with_delimiter(current_user.primary_referral_code.referrals.count) %></span>
+            <span class="text-sm text-muted-foreground ml-1">signups</span>
+          </div>
+          
+          <div>
+            <span class="text-lg font-semibold text-foreground tabular-nums"><%= number_with_delimiter(current_user.primary_referral_code.referrals.completed.count) %></span>
+            <span class="text-sm text-muted-foreground ml-1">completed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Referral Link -->
+      <div class="mb-10">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-4">Your link</h2>
+        
+        <div class="inline-flex items-center gap-3">
+          <code id="referral-link-input" class="text-sm font-mono text-foreground"><%= root_url(Refer.param_name => current_user.primary_referral_code.code) %></code>
+          <button 
+            type="button"
+            id="copy-referral-btn"
+            class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<%= render "shared/turbo_script" do %>
+  const code = document.getElementById('referral-link-input');
+  const btn = document.getElementById('copy-referral-btn');
+  
+  if (!code || !btn) return;
+  
+  function copyToClipboard() {
+    const text = code.textContent;
+    
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(showSuccess).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  
+  function fallbackCopy(text) {
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    try {
+      document.execCommand('copy');
+      showSuccess();
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+    document.body.removeChild(input);
+  }
+  
+  function showSuccess() {
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => btn.textContent = original, 1500);
+  }
+  
+  btn.addEventListener('click', copyToClipboard);
+  
+  return () => btn.removeEventListener('click', copyToClipboard);
+<% end %>

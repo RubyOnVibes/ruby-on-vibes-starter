@@ -1,0 +1,60 @@
+<div class="py-8 lg:py-12 px-4 mx-auto max-w-6xl w-full">
+  <div class="bg-card border-card border rounded-2xl shadow-sm p-6 lg:p-10">
+    <h1 class="text-3xl font-bold text-foreground mb-8"><%= t ".title" %></h1>
+
+    <div class="mb-8 p-6 bg-surface-1 rounded-xl">
+      <%= render partial: "payments/subscriptions/summary", locals: { subscription: @subscription } %>
+    </div>
+
+    <div class="mb-6">
+      <p class="font-semibold text-foreground mb-2"><%= t ".description", product: RubyOnVibes.config.application_name %></p>
+      <p class="text-lg text-muted-foreground">
+        <%= l Time.at(@invoice.period_start).to_date, format: :long %> - <%= l Time.at(@invoice.period_end).to_date, format: :long %>
+      </p>
+    </div>
+
+    <div class="overflow-x-auto -mx-6 lg:-mx-10">
+      <div class="inline-block min-w-full align-middle px-6 lg:px-10">
+        <table class="min-w-full divide-y border-border">
+          <thead>
+            <tr class="bg-surface-1">
+              <th class="px-4 py-3 text-left text-sm font-semibold text-foreground"><%= t ".line_items.description" %></th>
+              <th class="px-4 py-3 text-right text-sm font-semibold text-foreground"><%= t ".line_items.quantity" %></th>
+              <th class="px-4 py-3 text-right text-sm font-semibold text-foreground"><%= t ".line_items.unit_price" %></th>
+              <th class="px-4 py-3 text-right text-sm font-semibold text-foreground"><%= t ".line_items.total" %></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y border-border">
+            <% @invoice.lines.auto_paging_each do |line_item| %>
+              <tr class="bg-card hover:bg-surface-1 transition-colors">
+                <td class="px-4 py-3 text-sm text-foreground"><%= line_item.description %></td>
+                <td class="px-4 py-3 text-sm text-right text-foreground"><%= line_item.quantity %></td>
+                <td class="px-4 py-3 text-sm text-right text-muted-foreground"><%= Pay::Currency.format line_item.pricing.unit_amount_decimal, currency: line_item.currency %></td>
+                <td class="px-4 py-3 text-sm text-right text-foreground"><%= Pay::Currency.format line_item.amount, currency: line_item.currency %></td>
+              </tr>
+            <% end %>
+
+            <tr class="bg-surface-1">
+              <td colspan="3" class="px-4 pt-4 pb-2 text-sm text-right font-semibold text-foreground">Subtotal</td>
+              <td class="px-4 pt-4 pb-2 text-sm text-right text-foreground"><%= Pay::Currency.format @invoice.subtotal, currency: @invoice.currency %></td>
+            </tr>
+
+            <tr class="bg-surface-1">
+              <td colspan="3" class="px-4 py-2 text-sm text-right font-semibold text-foreground">Tax</td>
+              <td class="px-4 py-2 text-sm text-right text-foreground"><%= Pay::Currency.format (@invoice.total - @invoice.total_excluding_tax), currency: @invoice.currency %></td>
+            </tr>
+
+            <tr class="bg-surface-1">
+              <td colspan="3" class="px-4 pt-2 pb-4 text-base text-right font-bold text-foreground">Total</td>
+              <td class="px-4 pt-2 pb-4 text-base text-right font-bold text-foreground"><%= Pay::Currency.format @invoice.total, currency: @invoice.currency %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mt-8 pt-6 border-t border-border flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
+      <%= link_to t(".back"), payments_path, class: "btn btn-secondary" %>
+    </div>
+  </div>
+</div>

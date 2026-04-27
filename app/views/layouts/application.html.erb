@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || RubyOnVibes.application_name %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <% if ENV['USE_MOUNTED_VIBES'] == 'true' %>
+      <%= render "shared/vibes_iframe_bridge" %>
+    <% end %>
+
+    <!-- Initialize theme before render to prevent flash -->
+    <script nonce="<%= content_security_policy_nonce %>">
+      (function() {
+        // Default to light mode for new users - only dark if explicitly set
+        const stored = localStorage.getItem('theme');
+        if (stored === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
+    <%= yield :head %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
+    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Defensive: give unsized SVGs a sane default before Tailwind CSS loads (prevents giant SVGs in CDN mode) %>
+    <style<%= safe_nonce_attr %>>
+      @layer svg-safety {
+        svg:not([width]):not([height]) { width: 1em; height: 1em; }
+      }
+    </style>
+
+    <% if ENV['USE_MOUNTED_VIBES'] == 'true' %>
+      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.13"></script>
+    <% else %>
+      <%# Includes all stylesheet files in app/assets/stylesheets %>
+      <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <% end %>
+
+    <%# Importmap: Turbo + ahoy (needed for streaming/ActionCable) %>
+    <%= javascript_importmap_tags %>
+
+    <script src="https://js.stripe.com/clover/stripe.js"></script>
+
+    <%= render "vibes_javascript_utils" %>
+    <%= render "vibes_theme" %>
+    <%= render "devise/shared/styles" if devise_canvas? %>
+    <%= islands %>
+    
+    <%# Alpine.js for inline reactive components (complement to IslandJS) %>
+    <%# Load before Turbo shim but use defer to not block page rendering %>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+  </head>
+
+  <body class="antialiased bg-background text-foreground <%= content_for?(:body_class) ? yield(:body_class) : '' %>" data-user="<%= user_data_attrs %>" data-app="<%= app_data_attrs %>">
+    <%= render "shared/impersonation_banner" %>
+    
+    <%# React-based toast system using islandjs-rails %>
+    <%= react_component('ToastIsland', { flash: flash.to_hash }) %>
+        
+    <header class="w-full">
+      <%= render "navbar" %>
+    </header>
+
+    <% if devise_canvas? %>
+      <main class="mx-auto max-w-md px-6 pt-16 sm:pt-24">
+        <div class="devise-canvas">
+          <%= yield %>
+        </div>
+      </main>
+    <% else %>
+      <main class="w-full min-h-screen">
+        <%= yield %>
+      </main>
+    <% end %>
+  </body>
+</html>
