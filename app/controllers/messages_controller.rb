@@ -10,6 +10,12 @@
 class MessagesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat, only: [:create]
+
+  MENTIONABLE_RESOLVERS = {
+    "Chat" => :resolve_chat_mention,
+    "Member" => :resolve_member_mention,
+    "Workspace" => :resolve_workspace_mention
+  }.freeze
   
   # POST /messages
   # POST /chats/:chat_id/messages
@@ -23,15 +29,17 @@ class MessagesController < ApplicationController
     
     if raw_content.blank? && uploaded_files.empty?
       respond_to do |format|
-        format.turbo_stream { head :unprocessable_entity }
-        format.json { render json: { error: 'Content or files required' }, status: :unprocessable_entity }
+        format.turbo_stream { head :unprocessable_content }
+        format.json { render json: { error: 'Content or files required' }, status: :unprocessable_content }
       end
       return
     end
+
+    resolved_mentions = resolve_mentions(mentions_data)
     
     # Substitute @mentions with stable placeholders
     # "Hey @Chat 2" → "Hey <@chat_2abc>"
-    processed_content = substitute_mentions(raw_content, mentions_data)
+    processed_content = substitute_mentions(raw_content, resolved_mentions)
     
     # Create user message using chat helper (ruby_llm method)
     # This will broadcast automatically via after_create_commit
@@ -54,38 +62,13 @@ class MessagesController < ApplicationController
     
     # Store mentions (polymorphic association via prefixed ID)
     Rails.logger.info "[Mention] Received mentions_data: #{mentions_data.inspect}"
-    has_mentions = mentions_data.any?
-    if has_mentions
-      mentions_data.each do |mention|
-        mentioned_id = mention[:id] || mention['id']
-        model_type = mention[:model] || mention['model']
-        
-        Rails.logger.info "[Mention] Processing: #{model_type}##{mentioned_id}"
-        
-        begin
-          # Resolve prefixed ID to record
-          klass = model_type.constantize
-          record = if mentioned_id.to_s.include?('_') && klass.respond_to?(:find_by_prefix_id)
-            # Prefixed ID: "chat_xxx" → find_by_prefix_id("chat_xxx")
-            klass.find_by_prefix_id(mentioned_id)
-          else
-            # Fallback to regular find
-            klass.find_by(id: mentioned_id)
-          end
-          
-          if record
-            # No label stored - always fetched fresh from mentionable.mentionable_label
-            created_mention = @message.mentions.create!(
-              mentionable: record
-            )
-            Rails.logger.info "[Mention] Created: #{created_mention.inspect}"
-          else
-            Rails.logger.warn "[Mention] Could not resolve: #{model_type}##{mentioned_id}"
-          end
-        rescue => e
-          Rails.logger.error "[Mention] Failed to create mention: #{e.message}"
-          Rails.logger.error e.backtrace.first(5).join("\n")
-        end
+    if resolved_mentions.any?
+      resolved_mentions.each do |mention|
+        # No label stored - always fetched fresh from mentionable.mentionable_label
+        created_mention = @message.mentions.create!(
+          mentionable: mention.fetch(:record)
+        )
+        Rails.logger.info "[Mention] Created: #{created_mention.inspect}"
       end
     end
     
@@ -169,6 +152,76 @@ class MessagesController < ApplicationController
       end
     end
   end
+
+  def resolve_mentions(mentions_data)
+    mentions_data.filter_map do |mention|
+      mentioned_id = mention[:id] || mention['id']
+      model_type = normalize_mention_type(mention[:model] || mention['model'])
+      label = mention[:label] || mention['label']
+
+      unless model_type && mentioned_id.present?
+        Rails.logger.warn "[Mention] Skipped unknown mention type: #{mention.inspect}"
+        next
+      end
+
+      Rails.logger.info "[Mention] Processing: #{model_type}##{mentioned_id}"
+
+      record = send(MENTIONABLE_RESOLVERS.fetch(model_type), mentioned_id)
+      unless record
+        Rails.logger.warn "[Mention] Could not resolve in scope: #{model_type}##{mentioned_id}"
+        next
+      end
+
+      {
+        id: record.to_param,
+        model: model_type,
+        label: label.presence || record.mentionable_label,
+        record: record
+      }
+    rescue StandardError => e
+      Rails.logger.error "[Mention] Failed to resolve mention: #{e.message}"
+      Rails.logger.error e.backtrace.first(5).join("\n")
+      nil
+    end
+  end
+
+  def normalize_mention_type(model_type)
+    type = model_type.to_s.classify
+    MENTIONABLE_RESOLVERS.key?(type) ? type : nil
+  end
+
+  def resolve_chat_mention(mentioned_id)
+    find_scoped_mention(current_member.chats, mentioned_id)
+  end
+
+  def resolve_member_mention(mentioned_id)
+    return unless @chat
+
+    find_scoped_mention(@chat.members, mentioned_id)
+  end
+
+  def resolve_workspace_mention(mentioned_id)
+    scope = if @chat
+      Workspace.where(id: @chat.members.select(:workspace_id))
+    else
+      current_user.workspaces
+    end
+
+    find_scoped_mention(scope, mentioned_id)
+  end
+
+  def find_scoped_mention(scope, mentioned_id)
+    return if mentioned_id.blank?
+
+    if mentioned_id.to_s.include?('_') && scope.klass.respond_to?(:find_by_prefix_id)
+      record = scope.klass.find_by_prefix_id(mentioned_id)
+      return record if record && scope.exists?(id: record.id)
+    else
+      return scope.find_by(id: mentioned_id)
+    end
+
+    nil
+  end
   
   ##
   # Substitute display labels with stable ID placeholders
@@ -197,4 +250,3 @@ class MessagesController < ApplicationController
   end
   
 end
-

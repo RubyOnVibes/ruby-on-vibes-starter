@@ -11,7 +11,7 @@ class ChatRunsController < ApplicationController
     if @chat_run.cancel!(cancelled_by: current_user.email)
       render json: { status: 'cancelled' }, status: :ok
     else
-      render json: { error: 'Failed to cancel chat run' }, status: :unprocessable_entity
+      render json: { error: 'Failed to cancel chat run' }, status: :unprocessable_content
     end
   end
 

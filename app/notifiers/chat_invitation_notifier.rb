@@ -14,9 +14,9 @@
 #   ).deliver(invitee.user)
 #
 class ChatInvitationNotifier < ApplicationNotifier
-  # In-app only (no email)
-  deliver_by :database
-  
+  # In-app only (no email). Notifications auto-persist to the database;
+  # no `deliver_by :database` needed (and it's deprecated as of Noticed 2.x).
+
   notification_methods do
     def message
       inviter_name = params[:inviter_name] || 'Someone'

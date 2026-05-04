@@ -1,31 +1,32 @@
-# Claude Code Skills System
+# Hooks & Skills System
 
-This app uses Claude Code's hooks and skills system to enforce coding conventions.
+This app uses a hooks-and-skills pattern to enforce coding conventions. A PreToolUse hook intercepts Edit/Write operations on convention-governed files and blocks the edit until the relevant skill has been loaded into the conversation.
 
 ## How It Works
 
 1. **PreToolUse hook** fires before any Edit/Write operation
 2. Hook checks if the target file matches a pattern (e.g., `*/db/migrate/*.rb`)
 3. If matched, hook blocks the edit until the relevant skill is loaded
-4. Claude loads the skill, reads the conventions, then retries
+4. The agent loads the skill (Claude Code via the `Skill` tool, other agents via a `Read` of `.claude/skills/<name>/SKILL.md`)
 5. Hook allows the edit (skill is now in transcript)
 
 ## File Structure
 
 ```
 .claude/
-├── settings.json              # Hook configuration
+├── settings.json                          # Wires hooks → .claude/hooks/*.sh
 ├── hooks/
-│   └── rails-conventions.sh   # PreToolUse hook script
-└── commands/
-    ├── rails-model-conventions/SKILL.md
+│   ├── rails-conventions.sh               # PreToolUse hook
+│   ├── block-package-install.sh
+│   └── ruby-syntax-check.sh
+└── skills/
+    ├── rails-model-conventions/SKILL.md   # Skill content + YAML frontmatter
     ├── rails-controller-conventions/SKILL.md
-    ├── rails-migration-conventions/SKILL.md
-    ├── rails-job-conventions/SKILL.md
-    ├── rails-testing-conventions/SKILL.md
-    ├── inertia-page-conventions/SKILL.md
-    └── island-component-conventions/SKILL.md
+    ├── ...
+    └── theme-conventions/SKILL.md
 ```
+
+Each `SKILL.md` starts with YAML frontmatter (`name`, `description`) and is loaded by Claude Agent SDK as a model-invocable skill via the `Skill` tool. Non-Claude agents (Codex, Cursor, etc.) should `Read` the matching `SKILL.md` directly when editing files of that type — the conventions inside apply to any agent.
 
 ## File Pattern → Skill Mapping
 
@@ -44,19 +45,21 @@ This app uses Claude Code's hooks and skills system to enforce coding convention
 | `*/_navbar.html.erb`, `*/components/navbar/*`, navbar islands | navbar-conventions |
 | `*/_sidebar_nav.html.erb`, `*/components/settings/*`, sidebar islands | settings-sidebar-conventions |
 
-## Adding New Skills
+## Adding a New Skill
 
-1. Create `.claude/commands/my-skill/SKILL.md` with frontmatter:
+1. Write the skill at `.claude/skills/my-skill/SKILL.md`:
    ```markdown
    ---
    name: my-skill
    description: When to use this skill
    ---
+
    # My Skill
-   Conventions go here...
+
+   ...conventions go here...
    ```
 
-2. Add pattern check to `.claude/hooks/rails-conventions.sh`:
+2. Add a pattern check to `.claude/hooks/rails-conventions.sh`:
    ```bash
    if [[ "$file_path" == */path/pattern/*.rb ]]; then
      if skill_loaded "my-skill"; then
@@ -69,6 +72,6 @@ This app uses Claude Code's hooks and skills system to enforce coding convention
 
 ## Requirements
 
-- Hook script must be executable: `chmod +x .claude/hooks/*.sh`
+- Hook scripts must be executable: `chmod +x .claude/hooks/*.sh`
 - Requires `jq` for JSON parsing
-- SDK must use `settingSources: ['project']` to load hooks
+- Claude Agent SDK must use `settingSources: ['project']` so `.claude/settings.json` (and the wired hooks) loads

@@ -105,6 +105,7 @@ class Message < ApplicationRecord
       attachments: serialize_attachments,
       metadata: metadata || {},
       user: serialize_user,
+      compacted: compacted,
       createdAt: created_at&.iso8601,
       updatedAt: updated_at&.iso8601
     }

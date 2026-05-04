@@ -1,10 +1,12 @@
-# ada.md - AI Coding Agent Context
+# AGENTS.md — AI Coding Agent Context
 
-Named after Ada Lovelace, the first programmer. This file provides essential context for AI coding agents (like Ada) working on this Rails app.
+This file provides essential context for AI coding agents working on this Rails app. It follows the cross-vendor [AGENTS.md](https://agents.md) convention so any agent (Claude Code, Codex, Cursor, etc.) picks it up automatically.
 
 **For file-specific conventions**, the hooks system automatically loads skill files before editing:
+- Skill content lives in `.claude/skills/<name>/SKILL.md` (one folder per skill, with frontmatter)
+- Hooks live in `.claude/hooks/` and are wired up by `.claude/settings.json`
 - See `docs/SKILLS.md` for how the hooks/skills pattern works
-- Skills are in `.claude/commands/*/SKILL.md`
+- **Non-Claude agents** (Codex, Cursor, etc.) should `Read` the relevant `.claude/skills/<name>/SKILL.md` file directly when editing matching files; the shell hooks in `.claude/hooks/` apply equally well to any agent that runs them
 
 ---
 
@@ -31,7 +33,7 @@ This app ships with AI-native infrastructure. These systems are dormant until us
 
 ## Stack Overview
 
-- **Rails 8.1**, Ruby 3.4.x, Vite for JS, Propshaft for assets
+- **Rails 8.1**, Ruby 4.0.3, Vite for JS, Propshaft for assets
 - **Falcon** web server with **async-job-adapter** for LLM streaming
 - **SolidQueue** for most background jobs, async adapter for IO-heavy LLM work
 - **SQLite** (development) or **PostgreSQL** (production)
@@ -320,12 +322,13 @@ This app uses Claude Code's hooks to enforce conventions before file edits.
 
 When establishing a new pattern that future agents should follow:
 
-1. **Create skill file**: `.claude/commands/my-conventions/SKILL.md`
+1. **Write the skill file**: `.claude/skills/my-conventions/SKILL.md`
    ```markdown
    ---
    name: my-conventions
    description: Use when editing X files
    ---
+
    # My Conventions
    ...
    ```
@@ -359,4 +362,4 @@ When establishing a new pattern that future agents should follow:
 | `*/app/tools/*.rb` | ruby-llm-tools-conventions |
 | `*/_navbar.html.erb`, `*/components/navbar/NavbarCore.jsx`, `*/islands/components/*IconIsland.jsx`, `*/islands/components/*DropdownIsland.jsx` | navbar-conventions |
 
-**Note:** Regular views, helpers, and `vibes_helper.rb` no longer require the theme skill — color usage rules are in this file (ada.md). The theme skill is only needed when editing theme infrastructure files.
+**Note:** Regular views, helpers, and `vibes_helper.rb` no longer require the theme skill — color usage rules are in this file (AGENTS.md). The theme skill is only needed when editing theme infrastructure files.

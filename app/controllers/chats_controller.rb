@@ -52,7 +52,7 @@ class ChatsController < ApplicationController
     if @chat.update(chat_params)
       render json: { id: @chat.to_param, name: @chat.name }, status: :ok
     else
-      render json: { errors: @chat.errors }, status: :unprocessable_entity
+      render json: { errors: @chat.errors }, status: :unprocessable_content
     end
   end
   
@@ -123,7 +123,7 @@ class ChatsController < ApplicationController
     else
       respond_to do |format|
         format.html { redirect_to chat_path(@chat), alert: "Could not leave chat" }
-        format.json { render json: { error: 'Could not leave chat' }, status: :unprocessable_entity }
+        format.json { render json: { error: 'Could not leave chat' }, status: :unprocessable_content }
       end
     end
   end

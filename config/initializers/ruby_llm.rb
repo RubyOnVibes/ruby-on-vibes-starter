@@ -4,12 +4,12 @@ RubyLLM.configure do |config|
   # Anthropic support: use API key if present, otherwise use platform proxy if possible
   if ENV["ANTHROPIC_API_KEY"].present?
     config.anthropic_api_key = ENV["ANTHROPIC_API_KEY"]
-    config.default_model = "claude-sonnet-4-6"
+    config.default_model = "claude-sonnet-4-6"  unless default_model_set
     default_model_set = true
   elsif ENV["USE_MOUNTED_VIBES"] == "true" && ENV["VIBES_AI_PROXY_URL"].present?
     config.anthropic_api_base = ENV["VIBES_AI_PROXY_URL"]
     config.anthropic_api_key = ENV["VIBES_API_TOKEN"]
-    config.default_model = "claude-sonnet-4-6"
+    config.default_model = "claude-sonnet-4-6"  unless default_model_set
     default_model_set = true
   end
 
@@ -17,7 +17,7 @@ RubyLLM.configure do |config|
   if ENV["OPENAI_API_KEY"].present?
     config.openai_api_key = ENV["OPENAI_API_KEY"]
 
-    config.default_model = "gpt-4.1-nano" unless default_model_set
+    config.default_model = "gpt-5-nano" unless default_model_set
     default_model_set ||= true
   end
 

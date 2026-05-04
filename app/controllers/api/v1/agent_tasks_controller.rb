@@ -63,7 +63,7 @@ module Api
         if @agent_task.active? && @agent_task.cancel!
           render json: { status: "cancelled" }, status: :ok
         else
-          render json: { error: "Cannot cancel task (status: #{@agent_task.status})" }, status: :unprocessable_entity
+          render json: { error: "Cannot cancel task (status: #{@agent_task.status})" }, status: :unprocessable_content
         end
       end
 

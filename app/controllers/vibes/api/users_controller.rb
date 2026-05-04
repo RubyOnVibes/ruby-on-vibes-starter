@@ -16,7 +16,7 @@ module Vibes
         end
 
         if @errors.any?
-          render json: { success: false, created: @created, errors: @errors }, status: :unprocessable_entity
+          render json: { success: false, created: @created, errors: @errors }, status: :unprocessable_content
         else
           render json: { success: true, created: @created }, status: :created
         end

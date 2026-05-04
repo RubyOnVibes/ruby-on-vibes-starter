@@ -22,6 +22,7 @@
     attachments: message.serialize_attachments,
     metadata: message.metadata || {},
     user: message.serialize_user,
+    compacted: message.compacted,
     created_at: message.created_at&.iso8601,
     updated_at: message.updated_at&.iso8601
   }.to_json %>'

@@ -2,7 +2,7 @@ app = "vibes-template"
 primary_region = "iad"
 
 [build]
-image = "registry.fly.io/vibes-template-docker:spec295"
+image = "registry.fly.io/vibes-template-docker:spec298"
 
 # Remove release_command - volumes not available during release phase
 

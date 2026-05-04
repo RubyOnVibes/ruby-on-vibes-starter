@@ -27,12 +27,12 @@ RSpec.describe "Messages", type: :request do
     context "with empty content and no attachments" do
       it "returns 422" do
         post chat_messages_path(team_chat), params: { content: "" }, as: :json
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
 
       it "returns 422 for whitespace-only content" do
         post chat_messages_path(team_chat), params: { content: "   " }, as: :json
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
     end
 
@@ -91,36 +91,68 @@ RSpec.describe "Messages", type: :request do
       end
 
       it "substitutes mention labels with stable IDs in content" do
-        other_chat = chats(:alice_personal_chat)
+        mentioned_member = members(:bob_team_member)
 
         post chat_messages_path(team_chat), params: {
-          content: "Check out @Alice's Chat for details",
+          content: "Check with @#{mentioned_member.mentionable_label} for details",
           mentions: [
-            { id: other_chat.prefix_id, model: "Chat", label: "Alice's Chat" }
+            { id: mentioned_member.to_param, model: "Member", label: mentioned_member.mentionable_label }
           ]
         }, as: :json
 
         expect(response).to have_http_status(:ok)
 
         msg = team_chat.messages.last
-        expect(msg.content).to include("<@#{other_chat.prefix_id}>")
-        expect(msg.content).not_to include("@Alice's Chat")
+        expect(msg.content).to include("<@#{mentioned_member.to_param}>")
+        expect(msg.content).not_to include("@#{mentioned_member.mentionable_label}")
       end
 
       it "creates mention records for valid mentions" do
+        mentioned_member = members(:bob_team_member)
+
+        expect {
+          post chat_messages_path(team_chat), params: {
+            content: "See @#{mentioned_member.mentionable_label}",
+            mentions: [
+              { id: mentioned_member.to_param, model: "Member", label: mentioned_member.mentionable_label }
+            ]
+          }, as: :json
+        }.to change { Mention.count }.by(1)
+
+        mention = Mention.last
+        expect(mention.mentionable).to eq(mentioned_member)
+      end
+
+      it "ignores disallowed mention model names" do
+        expect {
+          post chat_messages_path(team_chat), params: {
+            content: "See @Bob Jones",
+            mentions: [
+              { id: bob.to_param, model: "User", label: "Bob Jones" }
+            ]
+          }, as: :json
+        }.not_to change { Mention.count }
+
+        msg = team_chat.messages.last
+        expect(msg.content).to include("@Bob Jones")
+        expect(msg.content).not_to include("<@")
+      end
+
+      it "ignores allowed model names outside the current mention scope" do
         other_chat = chats(:alice_personal_chat)
 
         expect {
           post chat_messages_path(team_chat), params: {
             content: "See @Alice's Chat",
             mentions: [
-              { id: other_chat.prefix_id, model: "Chat", label: "Alice's Chat" }
+              { id: other_chat.to_param, model: "Chat", label: "Alice's Chat" }
             ]
           }, as: :json
-        }.to change { Mention.count }.by(1)
+        }.not_to change { Mention.count }
 
-        mention = Mention.last
-        expect(mention.mentionable).to eq(other_chat)
+        msg = team_chat.messages.last
+        expect(msg.content).to include("@Alice's Chat")
+        expect(msg.content).not_to include("<@")
       end
     end
 

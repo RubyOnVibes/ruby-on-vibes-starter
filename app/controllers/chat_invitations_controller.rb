@@ -49,7 +49,7 @@ class ChatInvitationsController < ApplicationController
   rescue ActiveRecord::RecordNotFound => e
     render json: { error: 'Member not found' }, status: :not_found
   rescue ActiveRecord::RecordInvalid => e
-    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
+    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_content
   end
   
   ##
@@ -81,7 +81,7 @@ class ChatInvitationsController < ApplicationController
     else
       respond_to do |format|
         format.html { redirect_to chats_path, alert: "Failed to join chat" }
-        format.json { render json: { error: 'Failed to accept invitation' }, status: :unprocessable_entity }
+        format.json { render json: { error: 'Failed to accept invitation' }, status: :unprocessable_content }
       end
     end
   end

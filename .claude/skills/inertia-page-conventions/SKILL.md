@@ -144,7 +144,7 @@ This app uses a **semantic color system** — the default Tailwind palette is di
 - **Opacity:** `bg-primary/10`, `text-foreground/60`
 - **Gradients:** `from-primary to-accent`, `from-surface-0 to-surface-1`
 
-NEVER use `gray-*`, `blue-*`, `red-*`, `slate-*`, etc. — they are disabled and render nothing. See `docs/ada.md` for the full palette reference.
+NEVER use `gray-*`, `blue-*`, `red-*`, `slate-*`, etc. — they are disabled and render nothing. See `AGENTS.md` for the full palette reference.
 
 ## Common Mistakes
 

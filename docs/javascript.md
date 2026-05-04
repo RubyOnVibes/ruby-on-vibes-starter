@@ -29,7 +29,7 @@ No build step. No configuration. Just works.
 - Handles turbo:load, turbo:frame-load, and turbo:before-stream-render separately
 - Proper error handling and timing with queueMicrotask
 
-**Example usage:** See `docs/ada.md` → "Alpine.js" section and `app/views/devise/sessions/new.html.erb` for a password toggle example.
+**Example usage:** See `AGENTS.md` → "Alpine.js" section and `app/views/devise/sessions/new.html.erb` for a password toggle example.
 
 ## IslandJS Rails (React Components in ERB)
 

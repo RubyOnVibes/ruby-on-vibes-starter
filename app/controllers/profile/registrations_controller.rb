@@ -14,7 +14,7 @@ module Profile
           redirect_to edit_profile_registration_path, notice: "Profile updated successfully."
         end
       else
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 

@@ -5,7 +5,7 @@ description: Use when editing theme infrastructure files (_vibes_theme.html.erb,
 
 # Theme Extension Guide
 
-This skill is for **extending** the theme system (adding new semantic colors). For **using** existing colors, see `docs/ada.md` — it has the full palette reference.
+This skill is for **extending** the theme system (adding new semantic colors). For **using** existing colors, see `AGENTS.md` — it has the full palette reference.
 
 ## Extending the Theme
 

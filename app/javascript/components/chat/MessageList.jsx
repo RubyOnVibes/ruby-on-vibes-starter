@@ -39,6 +39,31 @@ function groupMessages(messages) {
   return groups
 }
 
+// True when every message in a group is marked compacted.
+function groupIsCompacted(group) {
+  if (!group) return false
+  if (group.type === 'tool-group') return group.messages.every((m) => m.compacted)
+  return Boolean(group.message?.compacted)
+}
+
+// Visual marker shown once where older messages were summarized into the system
+// prompt. Only one boundary exists per chat — compacted messages always precede
+// non-compacted ones in the timeline.
+function CompactionDivider({ count }) {
+  const label = count > 0
+    ? `${count} earlier ${count === 1 ? 'message' : 'messages'} summarized`
+    : 'Earlier conversation summarized'
+  return (
+    <div className="relative flex items-center py-2 my-1 select-none" aria-label="Conversation compacted">
+      <div className="flex-grow border-t border-dashed border-border"></div>
+      <span className="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex-grow border-t border-dashed border-border"></div>
+    </div>
+  )
+}
+
 function DefaultEmptyState() {
   return (
     <div className="flex-1 flex items-center justify-center text-center px-4">
@@ -207,6 +232,11 @@ export function MessageList({
 
   const messageGroups = useMemo(() => groupMessages(messages), [messages])
 
+  const compactedMessageCount = useMemo(
+    () => messages.reduce((acc, m) => acc + (m.compacted ? 1 : 0), 0),
+    [messages]
+  )
+
   const contentHash = useMemo(() => {
     return messages.map(m => `${m.id}:${m.content?.length || 0}`).join(',')
   }, [messages])
@@ -260,29 +290,36 @@ export function MessageList({
       aria-live="polite"
       aria-atomic="false"
     >
-      {messageGroups.map((group) => {
+      {messageGroups.map((group, idx) => {
+        const prevGroup = idx > 0 ? messageGroups[idx - 1] : null
+        const showCompactionDivider = prevGroup && groupIsCompacted(prevGroup) && !groupIsCompacted(group)
+
+        let rendered
         if (group.type === 'tool-group') {
-          return <ToolCallGroup key={group.key} messages={group.messages} />
-        }
-
-        const message = group.message
-
-        if (renderMessage) {
-          return <React.Fragment key={group.key}>{renderMessage(message)}</React.Fragment>
-        }
-
-        if (message.role === 'tool') {
-          return <CollapsibleToolCall key={group.key} message={message} defaultExpanded={false} />
+          rendered = <ToolCallGroup messages={group.messages} />
+        } else {
+          const message = group.message
+          if (renderMessage) {
+            rendered = renderMessage(message)
+          } else if (message.role === 'tool') {
+            rendered = <CollapsibleToolCall message={message} defaultExpanded={false} />
+          } else {
+            rendered = (
+              <MessageBubble
+                message={message}
+                currentUserId={currentUserId}
+                isGroupChat={isGroupChat}
+                showTimestamp={showTimestamps}
+              />
+            )
+          }
         }
 
         return (
-          <MessageBubble
-            key={group.key}
-            message={message}
-            currentUserId={currentUserId}
-            isGroupChat={isGroupChat}
-            showTimestamp={showTimestamps}
-          />
+          <React.Fragment key={group.key}>
+            {showCompactionDivider && <CompactionDivider count={compactedMessageCount} />}
+            {rendered}
+          </React.Fragment>
         )
       })}
 

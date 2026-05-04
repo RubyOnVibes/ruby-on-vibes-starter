@@ -4,6 +4,11 @@ An opinionated, AI-enhanced Rails 8 template for building agentic web applicatio
 
 Built on Falcon (async fiber-based web server), SolidQueue (background jobs), RubyLLM (multi-provider AI), and Inertia.js (React islands + Turbo).
 
+## Community
+
+- **Website:** [rubyonvibes.com](https://rubyonvibes.com)
+- **Discord:** [Join the community](https://discord.gg/DrfUKhtFmD)
+
 ## Quickstart
 
 ```bash
