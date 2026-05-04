@@ -132,7 +132,7 @@ gem "noticed", "~> 2.8"
 
 # https://github.com/pay-rails/pay
 # Optional — billing/subscriptions. Pairs with stripe + receipts. Disable in config/vibes.yml.
-gem "pay", "~> 11.1"
+gem "pay", "~> 11.6"
 
 # https://github.com/ankane/pretender
 gem "pretender"
