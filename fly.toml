@@ -2,7 +2,7 @@ app = "vibes-template"
 primary_region = "iad"
 
 [build]
-image = "registry.fly.io/vibes-template-docker:spec298"
+image = "registry.fly.io/vibes-template-docker:spec301"
 
 # Remove release_command - volumes not available during release phase
 
@@ -12,7 +12,8 @@ image = "registry.fly.io/vibes-template-docker:spec298"
   RAILS_ENV = "production"
   RAILS_SERVE_STATIC_FILES = "true"
   RAILS_LOG_TO_STDOUT = "true"
-  ALLOW_IFRAME_EMBEDDING = "true"
+  # EMBED_ALLOW_IFRAME = "true"
+  # EMBED_ALLOWLIST = "https://your-platform.example"
 
 [[mounts]]
   source = "app_data"

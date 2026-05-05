@@ -66,15 +66,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Persistent agents — CRUD + activate/deactivate
-  resources :agents, only: [:index, :show, :new, :create, :edit, :update, :destroy] do
-    member do
-      post :activate
-      post :deactivate
-      post :regenerate_webhook_token
-    end
-  end
-
   # Agent tasks - workspace-level index + show
   resources :agent_tasks, only: [:index, :show]
   

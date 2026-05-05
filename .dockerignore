@@ -35,6 +35,10 @@
 /app/assets/builds/*
 !/app/assets/builds/.keep
 /public/assets
+/public/vite
+/public/islands
+/public/vendor/islands
+/vite/ssr
 
 # Ignore CI service files.
 /.github

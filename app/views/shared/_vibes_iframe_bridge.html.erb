@@ -1,3 +1,27 @@
+<%
+  parent_origin_values = [
+    ENV["EMBED_ALLOWLIST"],
+    ENV["PLATFORM_URL"],
+    ENV["VIBES_PLATFORM_URL"],
+    ENV["RUBY_ON_VIBES_PLATFORM_URL"]
+  ].compact.flat_map { |value| value.to_s.split(",") }
+
+  vibes_bridge_parent_origins = parent_origin_values.filter_map do |value|
+    value = value.strip
+    next if value.blank?
+
+    uri = URI.parse(value)
+    uri = URI.parse("https://#{value}") if uri.scheme.blank?
+    next unless uri.scheme.in?(%w[http https]) && uri.host.present?
+
+    default_port = (uri.scheme == "https" ? 443 : 80)
+    port = uri.port && uri.port != default_port ? ":#{uri.port}" : ""
+    "#{uri.scheme}://#{uri.host}#{port}"
+  rescue URI::InvalidURIError
+    nil
+  end.uniq
+%>
+
 <script>
 /**
  * Vibes Iframe Bridge
@@ -23,7 +47,30 @@
     return;
   }
 
-  const parentOrigin = '*'; // Safe: we control both parent and iframe
+  const allowedParentOrigins = <%= raw vibes_bridge_parent_origins.to_json %>;
+
+  function detectParentOrigin() {
+    try {
+      if (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
+        return window.location.ancestorOrigins[0];
+      }
+
+      if (document.referrer) {
+        return new URL(document.referrer).origin;
+      }
+    } catch (error) {
+      // Silent fail
+    }
+
+    return null;
+  }
+
+  const parentOrigin = detectParentOrigin();
+  if (!parentOrigin || !allowedParentOrigins.includes(parentOrigin)) {
+    console.warn('[Vibes Bridge] Disabled: parent origin is not allowed.');
+    return;
+  }
+
   let lastUrl = '';
 
   // Helper: Extract file/line from stack trace

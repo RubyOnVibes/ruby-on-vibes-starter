@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { sanitizeMessages, normalizeContent } from '../components/chat/types'
 
+function normalizeBoolean(value) {
+  return value === true || value === 'true' || value === 1 || value === '1'
+}
+
 export function useTurboChat(
   chatId,
   options = {}
@@ -57,6 +61,7 @@ export function useTurboChat(
           metadata: payload.metadata || {},
           tool_call_name: payload.tool_call_name || null,
           user: payload.user || null,
+          compacted: normalizeBoolean(payload.compacted),
           createdAt: payload.created_at,
           updatedAt: payload.updated_at
         })
@@ -124,6 +129,7 @@ export function useTurboChat(
                 metadata: payload.metadata || {},
                 tool_call_name: payload.tool_call_name || null,
                 user: payload.user || null,
+                compacted: normalizeBoolean(payload.compacted),
                 createdAt: payload.created_at,
                 updatedAt: payload.updated_at,
                 needsReconciliation: payload.role === 'user'
@@ -282,6 +288,7 @@ export function useTurboChat(
       mentions,
       attachments: [],
       metadata: {},
+      compacted: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isOptimistic: true
@@ -439,6 +446,7 @@ export function useTurboChat(
               metadata: serverMsg.metadata || {},
               tool_call_name: serverMsg.tool_call_name || null,
               user: serverMsg.user || null,
+              compacted: normalizeBoolean(serverMsg.compacted),
               createdAt: serverMsg.created_at || serverMsg.createdAt,
               updatedAt: serverMsg.updated_at || serverMsg.updatedAt
             }
@@ -467,7 +475,8 @@ export function useTurboChat(
                 content: serverContent,
                 role: serverMsg.role || existing.role,
                 mentions: serverMsg.mentions || existing.mentions,
-                attachments: serverMsg.attachments || existing.attachments
+                attachments: serverMsg.attachments || existing.attachments,
+                compacted: normalizeBoolean(serverMsg.compacted)
               }
               changed = true
             }
@@ -484,6 +493,7 @@ export function useTurboChat(
               metadata: serverMsg.metadata || {},
               tool_call_name: serverMsg.tool_call_name || null,
               user: serverMsg.user || null,
+              compacted: normalizeBoolean(serverMsg.compacted),
               createdAt: serverMsg.created_at || serverMsg.createdAt,
               updatedAt: serverMsg.updated_at || serverMsg.updatedAt
             }

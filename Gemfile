@@ -7,9 +7,9 @@ gem "propshaft"
 # Use sqlite3 as the database for Active Record
 gem "sqlite3", ">= 2.1"
 # Use PostgreSQL as the database for Active Record (optional upgrade from SQLite)
-gem 'pg', '~> 1.6', '>= 1.6.2'
+gem "pg", "~> 1.6", ">= 1.6.2"
 # Use the Falcon web server [https://github.com/socketry/falcon]
-gem 'falcon'
+gem "falcon"
 # Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
 gem "importmap-rails"
 # Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]
@@ -44,7 +44,7 @@ gem "thruster", require: false
 
 group :development, :test do
   # https://github.com/rubysec/bundler-audit
-  # gem 'bundler-audit'
+  gem "bundler-audit", require: false
 
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
@@ -56,7 +56,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   # https://github.com/rspec/rspec-rails
-  gem 'rspec-rails', '~> 8.0.0'
+  gem "rspec-rails", "~> 8.0.0"
 end
 
 group :development do
@@ -77,10 +77,10 @@ end
 # gem "acts_as_tenant"
 
 # https://github.com/socketry/async-cable
-gem 'async-cable'
+gem "async-cable"
 
 # https://github.com/socketry/async-job-adapter-active_job
-gem 'async-job-adapter-active_job'
+gem "async-job-adapter-active_job"
 
 # https://github.com/ankane/ahoy_matey
 # Optional — visit/event tracking; pairs with blazer for analytics dashboards.
@@ -94,7 +94,7 @@ gem "ahoy_matey"
 gem "blazer"
 
 # https://github.com/bkeepers/dotenv
-gem 'dotenv', groups: [:development, :test]
+gem "dotenv", groups: [ :development, :test ]
 
 # https://github.com/ankane/groupdate
 # gem "groupdate"
@@ -108,7 +108,7 @@ gem "devise", "~> 5.0"
 gem "inertia_rails"
 
 # https://github.com/Praxis-Emergent/islandjs-rails
-gem 'islandjs-rails', '~> 2.0'
+gem "islandjs-rails", "~> 2.0"
 
 # https://github.com/janko/image_processing
 gem "image_processing", "~> 1.2"
@@ -162,13 +162,13 @@ gem "refer"
 gem "resend"
 
 # https://github.com/crmne/ruby_llm
-gem 'ruby_llm', '1.13.2'
+gem "ruby_llm", "1.13.2"
 
 # https://github.com/getsentry/sentry-ruby
 # gem "sentry-rails"
 
 # https://github.com/stripe/stripe-ruby
-gem 'stripe', '~> 17.2'
+gem "stripe", "~> 17.2"
 
 # https://github.com/rails/tailwindcss-rails
 gem "tailwindcss-rails"
@@ -177,7 +177,7 @@ gem "tailwindcss-rails"
 gem "tailwindcss-ruby", "4.1.13"
 
 # https://github.com/nativestranger/tidewave_rails
-gem 'tidewave', git: "https://github.com/nativestranger/tidewave_rails.git", branch: "vibes"
+gem "tidewave", git: "https://github.com/nativestranger/tidewave_rails.git", branch: "vibes"
 
 # https://github.com/ElMassimo/vite_rails
 gem "vite_rails", "~> 3.0"

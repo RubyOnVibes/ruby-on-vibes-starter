@@ -1,0 +1,31 @@
+// vite.config.js
+import react from "file:///Users/eric/code/ruby-on-vibes/spec/templates/0_1_0/node_modules/@vitejs/plugin-react-swc/index.js";
+import { defineConfig } from "file:///Users/eric/code/ruby-on-vibes/spec/templates/0_1_0/node_modules/vite/dist/node/index.js";
+import tailwindcss from "file:///Users/eric/code/ruby-on-vibes/spec/templates/0_1_0/node_modules/@tailwindcss/vite/dist/index.mjs";
+import RubyPlugin from "file:///Users/eric/code/ruby-on-vibes/spec/templates/0_1_0/node_modules/vite-plugin-ruby/dist/index.js";
+import path from "path";
+var __vite_injected_original_dirname = "/Users/eric/code/ruby-on-vibes/spec/templates/0_1_0";
+var vite_config_default = defineConfig({
+  plugins: [
+    react(),
+    RubyPlugin(),
+    tailwindcss()
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__vite_injected_original_dirname, "app/javascript")
+    }
+  },
+  // Allow Vite to prebundle React/ReactDOM for faster dev and consistent bundling
+  optimizeDeps: {},
+  // SSR Configuration: Bundle all dependencies (no externals)
+  // This ensures the SSR bundle is self-contained and doesn't need node_modules at runtime
+  ssr: {
+    noExternal: true
+    // Bundle ALL dependencies into SSR bundle
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcuanMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCIvVXNlcnMvZXJpYy9jb2RlL3J1Ynktb24tdmliZXMvc3BlYy90ZW1wbGF0ZXMvMF8xXzBcIjtjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfZmlsZW5hbWUgPSBcIi9Vc2Vycy9lcmljL2NvZGUvcnVieS1vbi12aWJlcy9zcGVjL3RlbXBsYXRlcy8wXzFfMC92aXRlLmNvbmZpZy5qc1wiO2NvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9pbXBvcnRfbWV0YV91cmwgPSBcImZpbGU6Ly8vVXNlcnMvZXJpYy9jb2RlL3J1Ynktb24tdmliZXMvc3BlYy90ZW1wbGF0ZXMvMF8xXzAvdml0ZS5jb25maWcuanNcIjtpbXBvcnQgcmVhY3QgZnJvbSAnQHZpdGVqcy9wbHVnaW4tcmVhY3Qtc3djJ1xuaW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSAndml0ZSdcbmltcG9ydCB0YWlsd2luZGNzcyBmcm9tICdAdGFpbHdpbmRjc3Mvdml0ZSdcbmltcG9ydCBSdWJ5UGx1Z2luIGZyb20gJ3ZpdGUtcGx1Z2luLXJ1YnknXG5pbXBvcnQgcGF0aCBmcm9tICdwYXRoJ1xuXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoe1xuICBwbHVnaW5zOiBbXG4gICAgcmVhY3QoKSxcbiAgICBSdWJ5UGx1Z2luKCksXG4gICAgdGFpbHdpbmRjc3MoKSxcbiAgXSxcbiAgcmVzb2x2ZToge1xuICAgIGFsaWFzOiB7XG4gICAgICAnQCc6IHBhdGgucmVzb2x2ZShfX2Rpcm5hbWUsICdhcHAvamF2YXNjcmlwdCcpXG4gICAgfSxcbiAgfSxcbiAgLy8gQWxsb3cgVml0ZSB0byBwcmVidW5kbGUgUmVhY3QvUmVhY3RET00gZm9yIGZhc3RlciBkZXYgYW5kIGNvbnNpc3RlbnQgYnVuZGxpbmdcbiAgb3B0aW1pemVEZXBzOiB7fSxcbiAgLy8gU1NSIENvbmZpZ3VyYXRpb246IEJ1bmRsZSBhbGwgZGVwZW5kZW5jaWVzIChubyBleHRlcm5hbHMpXG4gIC8vIFRoaXMgZW5zdXJlcyB0aGUgU1NSIGJ1bmRsZSBpcyBzZWxmLWNvbnRhaW5lZCBhbmQgZG9lc24ndCBuZWVkIG5vZGVfbW9kdWxlcyBhdCBydW50aW1lXG4gIHNzcjoge1xuICAgIG5vRXh0ZXJuYWw6IHRydWUsIC8vIEJ1bmRsZSBBTEwgZGVwZW5kZW5jaWVzIGludG8gU1NSIGJ1bmRsZVxuICB9LFxufSlcbiJdLAogICJtYXBwaW5ncyI6ICI7QUFBMlUsT0FBTyxXQUFXO0FBQzdWLFNBQVMsb0JBQW9CO0FBQzdCLE9BQU8saUJBQWlCO0FBQ3hCLE9BQU8sZ0JBQWdCO0FBQ3ZCLE9BQU8sVUFBVTtBQUpqQixJQUFNLG1DQUFtQztBQU16QyxJQUFPLHNCQUFRLGFBQWE7QUFBQSxFQUMxQixTQUFTO0FBQUEsSUFDUCxNQUFNO0FBQUEsSUFDTixXQUFXO0FBQUEsSUFDWCxZQUFZO0FBQUEsRUFDZDtBQUFBLEVBQ0EsU0FBUztBQUFBLElBQ1AsT0FBTztBQUFBLE1BQ0wsS0FBSyxLQUFLLFFBQVEsa0NBQVcsZ0JBQWdCO0FBQUEsSUFDL0M7QUFBQSxFQUNGO0FBQUE7QUFBQSxFQUVBLGNBQWMsQ0FBQztBQUFBO0FBQUE7QUFBQSxFQUdmLEtBQUs7QUFBQSxJQUNILFlBQVk7QUFBQTtBQUFBLEVBQ2Q7QUFDRixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=

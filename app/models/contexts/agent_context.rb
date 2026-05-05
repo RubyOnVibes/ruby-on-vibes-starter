@@ -17,7 +17,7 @@ class AgentContext < RecordContext
     string :schedule, required: false, description: "Cron expression for scheduled runs"
     string :instructions_preview, description: "First 200 chars of the agent's instructions"
     string :chat_id, description: "The agent's persistent chat ID"
-    string :path, description: "CLICKABLE PATH - use this for markdown links to this agent"
+    string :path, description: "CLICKABLE PATH - use this for markdown links to this agent's chat"
     string :created_at, description: "When the agent was created (ISO8601)"
   end
 
@@ -31,7 +31,7 @@ class AgentContext < RecordContext
       status: agent.active? ? "active" : "inactive",
       instructions_preview: instructions.truncate(200),
       chat_id: agent.chat.to_param,
-      path: Rails.application.routes.url_helpers.agent_path(agent),
+      path: Rails.application.routes.url_helpers.chat_path(agent.chat),
       created_at: agent.created_at.iso8601
     }
 

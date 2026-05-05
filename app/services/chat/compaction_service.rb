@@ -104,13 +104,14 @@ class Chat::CompactionService
     messages_to_keep, messages_to_compact = partition_messages
     return false if messages_to_compact.empty?
 
+    compacted_message_ids = messages_to_compact.map(&:id)
     previous_summary = @chat.compaction_summary
 
     # LLM call OUTSIDE transaction — if it fails, DB is untouched
     summary_text = generate_summary(messages_to_compact, previous_summary)
 
     ActiveRecord::Base.transaction do
-      Message.where(id: messages_to_compact.map(&:id)).update_all(compacted: true)
+      Message.where(id: compacted_message_ids).update_all(compacted: true)
       @chat.update_columns(
         compaction_summary: summary_text,
         last_compacted_at: Time.current
@@ -118,8 +119,15 @@ class Chat::CompactionService
     end
 
     @chat.messages.reset  # Clear AR association cache after update_all
+    broadcast_compacted_messages(compacted_message_ids)
     Rails.logger.info "[Compaction] Chat #{@chat.id}: compacted #{messages_to_compact.size} messages"
     true
+  end
+
+  def broadcast_compacted_messages(message_ids)
+    Message.where(id: message_ids).find_each(&:broadcast_full_replace!)
+  rescue => e
+    Rails.logger.error "[Compaction] Chat #{@chat.id}: failed to broadcast compacted messages: #{e.class}: #{e.message}"
   end
 
   # --- Threshold ---
@@ -147,7 +155,7 @@ class Chat::CompactionService
   def estimated_tokens
     last_input = @chat.messages
       .where(role: :assistant, compacted: false, skip_llm_context: false)
-      .where.not(input_tokens: [nil, 0])
+      .where.not(input_tokens: [ nil, 0 ])
       .order(created_at: :desc)
       .pick(:input_tokens)
 
@@ -173,7 +181,7 @@ class Chat::CompactionService
       .order(:created_at)
       .to_a
 
-    return [all, []] if all.size < MIN_MESSAGES_TO_COMPACT
+    return [ all, [] ] if all.size < MIN_MESSAGES_TO_COMPACT
 
     # Find where the last N turns start (turn = user msg + response chain)
     turn_idx = find_turn_boundary(all, KEEP_RECENT_TURNS)
@@ -184,13 +192,13 @@ class Chat::CompactionService
     split_idx = if token_idx == 0
       turn_idx
     else
-      [turn_idx, token_idx].min
+      [ turn_idx, token_idx ].min
     end
     split_idx = find_safe_split(all, split_idx)
 
-    return [all, []] if split_idx < 2
+    return [ all, [] ] if split_idx < 2
 
-    [all[split_idx..], all[0...split_idx]]
+    [ all[split_idx..], all[0...split_idx] ]
   end
 
   def find_turn_boundary(msgs, turns)
@@ -271,7 +279,7 @@ class Chat::CompactionService
   end
 
   def build_transcript(messages)
-    budget = [MAX_TRANSCRIPT_CHARS / messages.size, 2000].min
+    budget = [ MAX_TRANSCRIPT_CHARS / messages.size, 2000 ].min
     messages.map { |m|
       role = m.role.to_s.capitalize
       text = m.content.to_s.truncate(budget)

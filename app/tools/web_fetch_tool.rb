@@ -36,15 +36,33 @@ class WebFetchTool < RubyLLM::Tool
 
   # Block requests to private/internal networks (SSRF protection)
   BLOCKED_IP_RANGES = [
+    IPAddr.new("0.0.0.0/8"),
     IPAddr.new("10.0.0.0/8"),
-    IPAddr.new("172.16.0.0/12"),
-    IPAddr.new("192.168.0.0/16"),
+    IPAddr.new("100.64.0.0/10"),
     IPAddr.new("127.0.0.0/8"),
     IPAddr.new("169.254.0.0/16"),
-    IPAddr.new("0.0.0.0/8"),
+    IPAddr.new("172.16.0.0/12"),
+    IPAddr.new("192.0.0.0/24"),
+    IPAddr.new("192.0.2.0/24"),
+    IPAddr.new("192.168.0.0/16"),
+    IPAddr.new("198.18.0.0/15"),
+    IPAddr.new("198.51.100.0/24"),
+    IPAddr.new("203.0.113.0/24"),
+    IPAddr.new("224.0.0.0/4"),
+    IPAddr.new("240.0.0.0/4"),
+    IPAddr.new("255.255.255.255/32"),
+    IPAddr.new("::/128"),
     IPAddr.new("::1/128"),
+    IPAddr.new("::ffff:0:0/96"),
+    IPAddr.new("64:ff9b::/96"),
+    IPAddr.new("100::/64"),
+    IPAddr.new("2001::/23"),
+    IPAddr.new("2001:2::/48"),
+    IPAddr.new("2001:db8::/32"),
+    IPAddr.new("2002::/16"),
     IPAddr.new("fc00::/7"),
-    IPAddr.new("fe80::/10")
+    IPAddr.new("fe80::/10"),
+    IPAddr.new("ff00::/8")
   ].freeze
 
   attr_reader :chat, :sender_user, :sender_member, :sender_workspace
@@ -102,9 +120,11 @@ class WebFetchTool < RubyLLM::Tool
 
   def fetch_with_redirects(uri, limit = MAX_REDIRECTS)
     raise "Too many redirects" if limit == 0
-    validate_not_private!(uri)
+    raise "Invalid URL: must start with http:// or https://" unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
 
+    resolved_ip = resolve_public_address!(uri)
     http = Net::HTTP.new(uri.host, uri.port)
+    http.ipaddr = resolved_ip
     http.use_ssl = (uri.scheme == "https")
     http.open_timeout = REQUEST_TIMEOUT
     http.read_timeout = REQUEST_TIMEOUT
@@ -119,7 +139,7 @@ class WebFetchTool < RubyLLM::Tool
     when Net::HTTPSuccess
       body = response.body
       raise "Response too large (#{body.bytesize} bytes)" if body.bytesize > MAX_RESPONSE_BYTES
-      [body, response["content-type"].to_s]
+      [ body, response["content-type"].to_s ]
     when Net::HTTPRedirection
       location = response["location"]
       new_uri = URI.parse(location)
@@ -130,16 +150,23 @@ class WebFetchTool < RubyLLM::Tool
     end
   end
 
-  def validate_not_private!(uri)
-    addrs = Socket.getaddrinfo(uri.host, nil, nil, :STREAM).map { |a| a[3] }.uniq
-    addrs.each do |addr|
-      ip = IPAddr.new(addr)
-      if BLOCKED_IP_RANGES.any? { |range| range.include?(ip) }
-        raise "Requests to private/internal networks are not allowed"
-      end
-    end
+  def resolve_public_address!(uri)
+    addresses = Socket.getaddrinfo(uri.host, uri.port, nil, :STREAM).map { |addr| addr[3] }.uniq
+    raise "Could not resolve hostname: #{uri.host}" if addresses.blank?
+
+    addresses.each { |address| validate_public_ip!(address) }
+    addresses.first
   rescue SocketError
     raise "Could not resolve hostname: #{uri.host}"
+  end
+
+  def validate_public_ip!(address)
+    ip = IPAddr.new(address)
+    return unless BLOCKED_IP_RANGES.any? { |range| range.include?(ip) }
+
+    raise "Requests to private/internal networks are not allowed"
+  rescue IPAddr::InvalidAddressError
+    raise "Could not resolve hostname to a valid address"
   end
 
   def html_content?(content_type)

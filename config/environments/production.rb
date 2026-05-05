@@ -37,7 +37,7 @@ Rails.application.configure do
   config.log_tags = [ :request_id ]
   # CONDITIONAL: dual_logger.rb initializer handles logger setup for vibecoding (STDOUT + file for MCP)
   # For vanilla Rails deploys, use standard STDOUT logging:
-  config.logger = ActiveSupport::TaggedLogging.logger(STDOUT) unless ENV['USE_MOUNTED_VIBES'] == 'true'
+  config.logger = ActiveSupport::TaggedLogging.logger(STDOUT) unless ENV["USE_MOUNTED_VIBES"] == "true"
 
   # Change to "debug" to log everything (including potentially personally-identifiable information!)
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
@@ -56,7 +56,7 @@ Rails.application.configure do
   RubyOnVibes.sync_action_mailer_config!
 
   # Configure default URL options for background jobs and routes helpers, etc
-  Rails.application.routes.default_url_options = { host: ENV.fetch('APPLICATION_URL', 'localhost:3000'), protocol: 'https' }
+  Rails.application.routes.default_url_options = { host: ENV.fetch("APPLICATION_URL", "localhost:3000"), protocol: "https" }
 
   # Email delivery configuration (priority: Resend → Mailbin → disabled)
   if RubyOnVibes.resend?
@@ -64,7 +64,7 @@ Rails.application.configure do
     # Requires verified domain on resend.com and API key in ENV['RESEND_API_KEY']
     config.action_mailer.delivery_method = :resend
     config.action_mailer.resend_settings = {
-      api_key: ENV.fetch('RESEND_API_KEY')
+      api_key: ENV.fetch("RESEND_API_KEY")
     }
   elsif RubyOnVibes.mailbin?
     # Development email capture (for testing without external provider)
@@ -104,20 +104,41 @@ Rails.application.configure do
   config.active_record.attributes_for_inspect = [ :id ]
 
   # Enable concise errors in production for mounted Vibes engine.
-  config.concise_errors.enable_in_production = (ENV['USE_MOUNTED_VIBES'] == 'true')
+  config.concise_errors.enable_in_production = (ENV["USE_MOUNTED_VIBES"] == "true")
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
+  host_from_url = lambda do |value|
+    value = value.to_s.strip
+    next if value.blank?
+
+    uri = URI.parse(value)
+    uri.host.presence || value
+  rescue URI::InvalidURIError
+    value
+  end
+
+  configured_hosts = [
+    host_from_url.call(ENV["APPLICATION_URL"]),
+    *(ENV["APP_HOSTS"] || "").split(",").map { |host| host_from_url.call(host) }
+  ].compact_blank.uniq
+
+  platform_hosts = if ENV["USE_MOUNTED_VIBES"] == "true"
+    [
+      /\A[a-z0-9-]+\.fly\.dev\z/,
+      /\A([a-z0-9-]+\.)?rubyonvibes\.com\z/
+    ]
+  else
+    []
+  end
+
+  config.hosts += configured_hosts + platform_hosts if configured_hosts.any? || platform_hosts.any?
+
   # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end
 
 # Optional hot-reload behavior for mounted Vibes engine in production when explicitly enabled.
-if ENV['USE_MOUNTED_VIBES'] == 'true'
+if ENV["USE_MOUNTED_VIBES"] == "true"
   Rails.application.configure do
     config.enable_reloading = true
     config.action_controller.perform_caching = false

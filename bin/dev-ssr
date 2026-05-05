@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+
+if [ ! -f vite/ssr/ssr.js ] && [ ! -f vite/ssr/ssr.mjs ] && [ ! -f vite/ssr/ssr.cjs ]; then
+  echo "Building initial SSR bundle..."
+  bin/vite build --ssr
+fi
+
+exec bin/vite ssr "$@"

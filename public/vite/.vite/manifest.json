@@ -2250,13 +2250,13 @@
     "isDynamicEntry": true
   },
   "../../node_modules/streamdown/dist/highlighted-body-B3W2YXNL.js": {
-    "file": "assets/highlighted-body-B3W2YXNL-BIkC5War.js",
+    "file": "assets/highlighted-body-B3W2YXNL-Bq2AhbH0.js",
     "name": "highlighted-body-B3W2YXNL",
     "src": "../../node_modules/streamdown/dist/highlighted-body-B3W2YXNL.js",
     "isDynamicEntry": true,
     "imports": [
       "entrypoints/islands.js",
-      "_client-DLdtn3m_.js"
+      "_client-C8JHwNO9.js"
     ]
   },
   "_angular-html-CU67Zn6k.js": {
@@ -2267,8 +2267,8 @@
       "../../node_modules/@shikijs/langs/dist/html.mjs"
     ]
   },
-  "_client-DLdtn3m_.js": {
-    "file": "assets/client-DLdtn3m_.js",
+  "_client-C8JHwNO9.js": {
+    "file": "assets/client-C8JHwNO9.js",
     "name": "client"
   },
   "assets/index.css": {
@@ -2277,7 +2277,7 @@
     "isEntry": true
   },
   "entrypoints/application.css": {
-    "file": "assets/application-BINsGA1d.css",
+    "file": "assets/application-DMeMn7Eb.css",
     "src": "entrypoints/application.css",
     "isEntry": true
   },
@@ -2288,21 +2288,21 @@
     "isEntry": true
   },
   "entrypoints/inertia.js": {
-    "file": "assets/inertia-CbkYHCnH.js",
+    "file": "assets/inertia-CvxJdnAf.js",
     "name": "entrypoints/inertia.js",
     "src": "entrypoints/inertia.js",
     "isEntry": true,
     "imports": [
-      "_client-DLdtn3m_.js"
+      "_client-C8JHwNO9.js"
     ]
   },
   "entrypoints/islands.js": {
-    "file": "assets/islands-DqLo2xWQ.js",
+    "file": "assets/islands-81rAJYAA.js",
     "name": "entrypoints/islands.js",
     "src": "entrypoints/islands.js",
     "isEntry": true,
     "imports": [
-      "_client-DLdtn3m_.js"
+      "_client-C8JHwNO9.js"
     ],
     "dynamicImports": [
       "../../node_modules/streamdown/dist/highlighted-body-B3W2YXNL.js",

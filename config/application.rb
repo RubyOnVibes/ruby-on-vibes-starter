@@ -5,7 +5,7 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
-require 'async/cable'
+require "async/cable"
 
 # Eagerly load RubyOnVibes config before Rails application initialization
 # so it's available in environment configs (development.rb, production.rb, etc.)
@@ -35,13 +35,14 @@ module RubyOnVibesTemplate
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
-    
+
     # Autoload custom validators from app/validators
     config.autoload_paths << Rails.root.join("app/validators")
-    
+
     # Autoload context classes from app/models/contexts
     # (e.g. WorkspaceContext, not Contexts::WorkspaceContext)
     config.autoload_paths << Rails.root.join("app/models/contexts")
+    config.eager_load_paths << Rails.root.join("app/models/contexts")
 
     # Replace the default in-process memory cache store with a durable alternative.
     config.cache_store = :solid_cache_store

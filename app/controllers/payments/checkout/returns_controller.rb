@@ -13,6 +13,6 @@ class Payments::Checkout::ReturnsController < ApplicationController
       flash[:alert] = "Bad request: contact support if this problem persists."
     end
 
-    redirect_to params.fetch(:return_to, root_path)
+    redirect_to url_from(params[:return_to]) || root_path
   end
 end
