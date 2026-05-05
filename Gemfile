@@ -174,7 +174,7 @@ gem "stripe", "~> 17.2"
 gem "tailwindcss-rails"
 
 # pin to tailwindcss version in package.json
-gem "tailwindcss-ruby", "4.1.13"
+gem "tailwindcss-ruby", "4.2.4"
 
 # https://github.com/nativestranger/tidewave_rails
 gem "tidewave", git: "https://github.com/nativestranger/tidewave_rails.git", branch: "vibes"
