@@ -1,3 +1,17 @@
+## What This Is
+
+This is not a minimal Rails starter. It is a normal Rails app with AI-product plumbing already in place:
+
+```text
+Rails app
+├─ users / auth / workspaces
+├─ chat streaming
+├─ LLM tools
+├─ background agent tasks
+├─ webhooks + scheduled agents
+├─ queues / notifications / billing hooks
+└─ optional Ruby on Vibes platform deploy path
+
 # Ruby on Vibes Starter
 
 An opinionated, AI-enhanced Rails 8 template for building agentic web applications. Chat with an AI assistant that can look things up, run background tasks autonomously, track its work, and report back — all on production-ready infrastructure.
