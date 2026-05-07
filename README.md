@@ -11,6 +11,7 @@ Rails app
 ├─ webhooks + scheduled agents
 ├─ queues / notifications / billing hooks
 └─ optional Ruby on Vibes platform deploy path
+```
 
 # Ruby on Vibes Starter
 
