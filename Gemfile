@@ -162,7 +162,7 @@ gem "refer"
 gem "resend"
 
 # https://github.com/crmne/ruby_llm
-gem "ruby_llm", "1.13.2"
+gem "ruby_llm", "1.14.1"
 
 # https://github.com/getsentry/sentry-ruby
 # gem "sentry-rails"
