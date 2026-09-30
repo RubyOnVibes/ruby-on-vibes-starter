@@ -20,6 +20,4 @@ RubyLLM.configure do |config|
     config.default_model = "gpt-5-nano" unless default_model_set
     default_model_set ||= true
   end
-
-  config.use_new_acts_as = true
 end

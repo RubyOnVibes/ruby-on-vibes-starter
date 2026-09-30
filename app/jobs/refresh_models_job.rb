@@ -3,7 +3,7 @@ class RefreshModelsJob < SolidQueueJob
   def perform
     return unless enabled?
     
-    Model.refresh!
+    RubyLLM.models.refresh
   end
 
   private

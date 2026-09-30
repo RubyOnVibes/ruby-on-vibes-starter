@@ -43,7 +43,7 @@ User message → ChatStreamJob (fiber) → LLM calls Tool → Tool returns resul
 class LookupCustomerTool < RubyLLM::Tool
   description "Look up a customer by email address."
 
-  params do
+  parameters do
     string :email, description: "The customer's email address", required: true
   end
 
@@ -113,7 +113,7 @@ class AnalyzeCustomersTool < RubyLLM::Tool
   description "Analyze all customers who haven't ordered in 30 days. " \
               "Runs in the background — you'll see progress updates below."
 
-  params do
+  parameters do
     integer :days, description: "Inactivity threshold in days (default: 30)", required: false
   end
 

@@ -12,7 +12,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'app/javascript')
+      '@': path.resolve(import.meta.dirname, 'app/javascript')
     },
   },
   // Allow Vite to prebundle React/ReactDOM for faster dev and consistent bundling

@@ -17,7 +17,7 @@
 
   <% if RubyOnVibes.llm? %>
     <div>
-      <p style="font-weight: bold;">LLMs: <%= Model.count %></p>
+      <p style="font-weight: bold;">LLMs: <%= RubyLLM::ActiveRecord::Model.count %></p>
     </div>
 
     <%= button_to "Refresh LLMs", "admin/refresh_models", method: :post, class: "btn" %>

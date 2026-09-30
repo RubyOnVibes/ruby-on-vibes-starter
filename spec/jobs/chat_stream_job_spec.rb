@@ -13,7 +13,7 @@ RSpec.describe ChatStreamJob, type: :job do
   #
   # All RubyLLM streaming, broadcasts, and tool execution are stubbed.
   #
-  # KEY FIXTURE DEPENDENCY: The on_new_message callback finds the latest
+  # KEY FIXTURE DEPENDENCY: The before_message callback finds the latest
   # assistant message to set @llm_msg. Tests rely on the `assistant_response`
   # fixture existing in alice_personal_chat. If you remove that fixture,
   # @llm_msg will be nil and tests will fail.
@@ -23,17 +23,6 @@ RSpec.describe ChatStreamJob, type: :job do
 
   let(:chat) { chats(:alice_personal_chat) }
   let(:user_message) { messages(:alice_message) }
-
-  # RubyLLM's acts_as_chat requires a Model record to resolve the provider.
-  # This seeds one so we never hit the Anthropic API in tests.
-  let!(:model_record) do
-    Model.find_or_create_by!(model_id: "claude-sonnet-4-6", provider: "anthropic") do |m|
-      m.name = "Claude Sonnet 4.6"
-      m.family = "claude"
-      m.context_window = 200_000
-      m.max_output_tokens = 8_192
-    end
-  end
 
   before do
     # No ActionCable in unit tests
@@ -66,20 +55,32 @@ RSpec.describe ChatStreamJob, type: :job do
   # Captures all four RubyLLM callback registrations and stubs with_tools/with_instructions.
   # Returns the callbacks hash so callers can fire them manually.
   def stub_callbacks
-    callbacks = {}
-    allow_any_instance_of(Chat).to receive(:on_new_message) { |_, &blk| callbacks[:on_new_message] = blk }
-    allow_any_instance_of(Chat).to receive(:on_tool_call) { |_, &blk| callbacks[:on_tool_call] = blk }
-    allow_any_instance_of(Chat).to receive(:on_tool_result) { |_, &blk| callbacks[:on_tool_result] = blk }
-    allow_any_instance_of(Chat).to receive(:on_end_message) { |_, &blk| callbacks[:on_end_message] = blk }
-    allow_any_instance_of(Chat).to receive(:with_tools).and_return(chat)
-    allow_any_instance_of(Chat).to receive(:with_instructions).and_return(chat)
+    callbacks = {
+      with_tools_calls: 0,
+      with_instructions_calls: 0,
+      system_messages_seen_by_with_tools: []
+    }
+    allow_any_instance_of(Chat).to receive(:before_message) { |_, &blk| callbacks[:before_message] = blk }
+    allow_any_instance_of(Chat).to receive(:before_tool_call) { |_, &blk| callbacks[:before_tool_call] = blk }
+    allow_any_instance_of(Chat).to receive(:after_tool_result) { |_, &blk| callbacks[:after_tool_result] = blk }
+    allow_any_instance_of(Chat).to receive(:after_message) { |_, &blk| callbacks[:after_message] = blk }
+    allow_any_instance_of(Chat).to receive(:with_tools) do |instance, *_args|
+      callbacks[:with_tools_calls] += 1
+      callbacks[:system_messages_seen_by_with_tools] <<
+        instance.messages.where(role: :user, user_submitted: false).count
+      instance
+    end
+    allow_any_instance_of(Chat).to receive(:with_instructions) do |instance, *_args|
+      callbacks[:with_instructions_calls] += 1
+      instance
+    end
     callbacks
   end
 
   # Stubs the full RubyLLM callback chain so the job can run end-to-end.
   # Creates an empty assistant message (simulating what RubyLLM does internally
-  # before streaming starts), then fires on_new_message (which finds it and
-  # sets @llm_msg) and on_end_message.
+  # before streaming starts), then fires before_message (which finds it and
+  # sets @llm_msg) and after_message.
   #
   # The `before_streaming` proc runs at the top of chat.complete — use it to
   # observe mid-execution state (e.g., ChatRun status after it's set to :running).
@@ -90,14 +91,14 @@ RSpec.describe ChatStreamJob, type: :job do
       before_streaming&.call
 
       # Simulate RubyLLM creating an empty assistant message before streaming.
-      # The on_new_message callback queries for `role: :assistant, content: ""`.
+      # The before_message callback queries for `role: :assistant, content: ""`.
       inst.messages.create!(role: :assistant, content: "")
 
-      callbacks[:on_new_message]&.call
+      callbacks[:before_message]&.call
 
       chunks.each { |text| block.call(OpenStruct.new(content: text)) }
 
-      callbacks[:on_end_message]&.call(
+      callbacks[:after_message]&.call(
         OpenStruct.new(role: 'assistant', content: chunks.compact.join(''))
       )
     end
@@ -163,7 +164,7 @@ RSpec.describe ChatStreamJob, type: :job do
         run.update!(status: :cancelled, cancelled_at: Time.current)
 
         block.call(OpenStruct.new(content: "Second chunk"))
-        callbacks[:on_new_message]&.call
+        callbacks[:before_message]&.call
       end
 
       described_class.perform_now(chat.id, user_message.id, run.id)
@@ -179,7 +180,7 @@ RSpec.describe ChatStreamJob, type: :job do
     it "marks run as failed, sets error content, and re-raises" do
       run = create_chat_run!
 
-      # stub_callbacks wires on_new_message/with_tools/etc so setup_chat succeeds
+      # stub_callbacks wires the RubyLLM lifecycle callbacks so setup_chat succeeds
       stub_callbacks
       allow_any_instance_of(Chat).to receive(:complete)
         .and_raise(RuntimeError, "API connection failed")
@@ -219,12 +220,11 @@ RSpec.describe ChatStreamJob, type: :job do
   describe "setup" do
     it "wires instructions and tools on the chat" do
       run = create_chat_run!
-
-      expect_any_instance_of(Chat).to receive(:with_instructions).and_return(chat)
-      expect_any_instance_of(Chat).to receive(:with_tools).and_return(chat)
-
-      stub_chat_streaming(chunks: ["Hi"])
+      callbacks = stub_chat_streaming(chunks: ["Hi"])
       described_class.perform_now(chat.id, user_message.id, run.id)
+
+      expect(callbacks[:with_instructions_calls]).to eq(1)
+      expect(callbacks[:with_tools_calls]).to eq(2)
     end
   end
 
@@ -232,13 +232,13 @@ RSpec.describe ChatStreamJob, type: :job do
   # 7. CALLBACK REGISTRATION
   # ============================================================================
   describe "callback registration" do
-    it "registers on_new_message, on_tool_call, on_tool_result, and on_end_message" do
+    it "registers before_message, before_tool_call, after_tool_result, and after_message" do
       registered = []
 
-      allow_any_instance_of(Chat).to receive(:on_new_message) { registered << :on_new_message }
-      allow_any_instance_of(Chat).to receive(:on_tool_call) { registered << :on_tool_call }
-      allow_any_instance_of(Chat).to receive(:on_tool_result) { registered << :on_tool_result }
-      allow_any_instance_of(Chat).to receive(:on_end_message) { registered << :on_end_message }
+      allow_any_instance_of(Chat).to receive(:before_message) { registered << :before_message }
+      allow_any_instance_of(Chat).to receive(:before_tool_call) { registered << :before_tool_call }
+      allow_any_instance_of(Chat).to receive(:after_tool_result) { registered << :after_tool_result }
+      allow_any_instance_of(Chat).to receive(:after_message) { registered << :after_message }
       allow_any_instance_of(Chat).to receive(:with_tools).and_return(chat)
       allow_any_instance_of(Chat).to receive(:with_instructions).and_return(chat)
 
@@ -246,7 +246,7 @@ RSpec.describe ChatStreamJob, type: :job do
       job = described_class.new
       job.send(:setup_chat, chat.id, user_message.id)
 
-      expect(registered).to contain_exactly(:on_new_message, :on_tool_call, :on_tool_result, :on_end_message)
+      expect(registered).to contain_exactly(:before_message, :before_tool_call, :after_tool_result, :after_message)
     end
   end
 
@@ -312,7 +312,7 @@ RSpec.describe ChatStreamJob, type: :job do
 
     it "creates a system-generated user message when user_msg_id is nil" do
       run = create_chat_run!
-      stub_chat_streaming(chunks: ["Here are your results!"])
+      callbacks = stub_chat_streaming(chunks: ["Here are your results!"])
 
       expect {
         described_class.perform_now(chat.id, nil, run.id, {
@@ -323,6 +323,7 @@ RSpec.describe ChatStreamJob, type: :job do
       }.to change { chat.messages.where(role: :user, user_submitted: false).count }.by(1)
 
       expect(run.reload.status).to eq("completed")
+      expect(callbacks[:system_messages_seen_by_with_tools]).to all(be >= 1)
     end
 
     it "does not create a system-generated message for normal runs" do

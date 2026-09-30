@@ -8,8 +8,8 @@
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
-ARG RUBY_VERSION=4.0.3
-FROM docker.io/library/node:24.13.0-bullseye-slim AS node
+ARG RUBY_VERSION=4.0.7
+FROM docker.io/library/node:24.21.0-bookworm-slim AS node
 
 FROM docker.io/library/ruby:${RUBY_VERSION}-bookworm AS base
 
@@ -53,7 +53,7 @@ RUN yarn install --frozen-lockfile --production=false
 
 # Install application gems (standard Rails - no gemspec needed)
 COPY Gemfile Gemfile.lock ./
-RUN bundle config build.openssl --with-openssl-dir=/usr && \
+RUN bundle config set build.openssl --with-openssl-dir=/usr && \
     bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
     bundle exec bootsnap precompile --gemfile
@@ -73,7 +73,7 @@ RUN yarn vite build
 RUN yarn build:islands
 
 # Build SSR bundle for Inertia.js server-side rendering
-RUN bin/vite build --ssr
+RUN SECRET_KEY_BASE_DUMMY=1 bin/vite build --ssr
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
@@ -86,6 +86,7 @@ RUN echo "📋 Pre-building SQLite databases for deployment..." && \
     mkdir -p /rails/db/templates && \
     mkdir -p storage && \
     SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production DISABLE_DATABASE_ENVIRONMENT_CHECK=1 ./bin/rails db:schema:load && \
+    SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production ./bin/rails ruby_llm:load_models && \
     echo "✅ Databases created, verifying..." && \
     ls -lh storage/production*.sqlite3
 

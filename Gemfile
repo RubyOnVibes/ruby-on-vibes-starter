@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.0"
+gem "rails", "~> 8.1.4"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use sqlite3 as the database for Active Record
@@ -132,7 +132,7 @@ gem "noticed", "~> 2.8"
 
 # https://github.com/pay-rails/pay
 # Optional — billing/subscriptions. Pairs with stripe + receipts. Disable in config/vibes.yml.
-gem "pay", "~> 11.1"
+gem "pay", "~> 11.8"
 
 # https://github.com/ankane/pretender
 gem "pretender"
@@ -144,7 +144,7 @@ gem "pretender"
 # gem "omniauth-rails_csrf_protection", "~> 1.0"
 
 # https://github.com/ddnexus/pagy
-gem "pagy", "43.2.0"
+gem "pagy", "~> 43.5", ">= 43.5.6"
 
 # https://github.com/excid3/prefixed_ids
 gem "prefixed_ids"
@@ -162,22 +162,22 @@ gem "refer"
 gem "resend"
 
 # https://github.com/crmne/ruby_llm
-gem "ruby_llm", "1.13.2"
+gem "ruby_llm", "2.0.0"
 
 # https://github.com/getsentry/sentry-ruby
 # gem "sentry-rails"
 
 # https://github.com/stripe/stripe-ruby
-gem "stripe", "~> 17.2"
+gem "stripe", "~> 19.6", ">= 19.6.2"
 
 # https://github.com/rails/tailwindcss-rails
 gem "tailwindcss-rails"
 
 # pin to tailwindcss version in package.json
-gem "tailwindcss-ruby", "4.1.13"
+gem "tailwindcss-ruby", "4.3.3"
 
 # https://github.com/nativestranger/tidewave_rails
 gem "tidewave", git: "https://github.com/nativestranger/tidewave_rails.git", branch: "vibes"
 
 # https://github.com/ElMassimo/vite_rails
-gem "vite_rails", "~> 3.0"
+gem "vite_rails", "~> 3.11"

@@ -12,7 +12,7 @@ class CurrentDateTimeTool < RubyLLM::Tool
     The tool respects the user's configured timezone by default.
   DESC
 
-  params do
+  parameters do
     string :timezone, description: "IANA timezone (e.g., 'America/New_York', 'Europe/London'). Defaults to user's timezone or UTC.", required: false
     string :format, description: "Output format: 'full' (default), 'date', 'time', or 'iso8601'", required: false
   end

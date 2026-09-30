@@ -1,8 +1,11 @@
 {
   "app/javascript/entrypoints/islands.js": {
-    "file": "islands_bundle.UAbWP-Xz.js",
+    "file": "islands_bundle.CwUsYyJ6.js",
     "name": "islands",
     "src": "app/javascript/entrypoints/islands.js",
-    "isEntry": true
+    "isEntry": true,
+    "dynamicImports": [
+      "app/javascript/entrypoints/islands.js"
+    ]
   }
 }

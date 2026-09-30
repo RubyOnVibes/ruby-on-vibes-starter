@@ -153,11 +153,11 @@ class Chat::CompactionService
   # Fallback: chars/4 estimate for seeded/imported messages without token data.
   #
   def estimated_tokens
-    last_input = @chat.messages
+    last_assistant = @chat.messages
       .where(role: :assistant, compacted: false, skip_llm_context: false)
-      .where.not(input_tokens: [ nil, 0 ])
       .order(created_at: :desc)
-      .pick(:input_tokens)
+      .first
+    last_input = last_assistant&.tokens&.input
 
     return last_input if last_input
 
@@ -204,7 +204,7 @@ class Chat::CompactionService
   def find_turn_boundary(msgs, turns)
     found = 0
     (msgs.size - 1).downto(0) do |i|
-      if msgs[i].role.to_s == "user" && msgs[i].tool_call_id.nil?
+      if msgs[i].role.to_s == "user" && !msgs[i].tool_result?
         found += 1
         return i if found >= turns
       end
@@ -224,7 +224,7 @@ class Chat::CompactionService
   # Ensure split happens at a user message boundary (not mid-tool-chain)
   def find_safe_split(msgs, proposed)
     idx = proposed
-    idx -= 1 while idx > 0 && !(msgs[idx].role.to_s == "user" && msgs[idx].tool_call_id.nil?)
+    idx -= 1 while idx > 0 && !(msgs[idx].role.to_s == "user" && !msgs[idx].tool_result?)
     idx == 0 ? proposed : idx
   end
 

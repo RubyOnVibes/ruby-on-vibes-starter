@@ -14,7 +14,7 @@ module Examples
     description "Run a test background task that intentionally fails to test error handling and retries. " \
                 "The task will retry up to 3 times with a 5-second delay between attempts."
 
-    params do
+    parameters do
       string :message, description: "Error message to simulate (default: 'Simulated failure for testing')", required: false
     end
 

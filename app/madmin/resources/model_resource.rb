@@ -1,4 +1,6 @@
 class ModelResource < Madmin::Resource
+  model RubyLLM::ActiveRecord::Model
+
   menu parent: "LLMs", position: 0
 
   # Attributes

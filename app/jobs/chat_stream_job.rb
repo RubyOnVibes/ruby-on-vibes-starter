@@ -21,18 +21,6 @@ class ChatStreamJob < AsyncQueueJob
     # Must run before streaming — broken chains cause API errors.
     @chat.recover_from_tool_errors!
 
-    # Continuation mode: inject a system-generated user message.
-    # Anthropic's API requires conversations to end with a user message.
-    # Without this, complete() sends history ending with an assistant message → API error.
-    if @continuation_mode
-      @chat.messages.create!(
-        role: :user,
-        content: "My background tasks have finished. Please check the results and let me know what happened.",
-        user_submitted: false,
-        skip_llm_context: false
-      )
-    end
-
     @chat_run.update!(status: :running)
     stream_response
     return if stopped?
@@ -66,7 +54,7 @@ class ChatStreamJob < AsyncQueueJob
       @chat_run.update!(status: :completed)
     end
 
-    @llm_msg.broadcast_upsert_to_chat!
+    @llm_msg&.broadcast_upsert_to_chat!
     @chat_run
   rescue RubyLLM::Error => e
     # RubyLLM errors (including tool call mismatches from cancellation race)
@@ -163,13 +151,26 @@ class ChatStreamJob < AsyncQueueJob
       @sender_workspace = @sender_member&.workspace
     end
 
+    # Insert the synthetic user turn before with_tools/with_instructions calls
+    # materialize RubyLLM's cached conversation. Anthropic requires the history
+    # to end with a user message, and RubyLLM 2.0 does not automatically reload
+    # messages added after the chat object has been built.
+    if @continuation_mode
+      @chat.messages.create!(
+        role: :user,
+        content: "My background tasks have finished. Please check the results and let me know what happened.",
+        user_submitted: false,
+        skip_llm_context: false
+      )
+    end
+
     add_tools
     add_instructions
     add_new_message_callback
   end
 
   def add_new_message_callback
-    @chat.on_new_message do
+    @chat.before_message do
       if stopped?
         Rails.logger.info "[ChatStreamJob] Skipping new message tracking (run cancelled)"
         next
@@ -181,7 +182,7 @@ class ChatStreamJob < AsyncQueueJob
         Rails.logger.info "[ChatStreamJob] 🆕 New message placeholder: #{latest.id}"
         # Set @llm_msg to the latest empty assistant message.
         # This may be a real assistant response OR a tool placeholder —
-        # we can't tell yet because tool_calls aren't persisted until on_end_message.
+        # we can't tell yet because tool calls aren't persisted until after_message.
         # For tool placeholders, no streaming chunks arrive so this is harmless.
         @llm_msg = latest
         @accumulated = '' if defined?(@accumulated)
@@ -189,15 +190,15 @@ class ChatStreamJob < AsyncQueueJob
       end
     end
 
-    @chat.on_tool_call do |tool_call|
+    @chat.before_tool_call do |tool_call|
       Rails.logger.info "[ChatStreamJob] 🔧 Executing: #{tool_call.name}"
     end
 
-    @chat.on_tool_result do |result|
+    @chat.after_tool_result do |result|
       Rails.logger.info "[ChatStreamJob] ✅ Tool completed"
     end
 
-    @chat.on_end_message do |message|
+    @chat.after_message do |message|
       next unless message
 
       if stopped?
@@ -251,7 +252,7 @@ class ChatStreamJob < AsyncQueueJob
       sender_workspace: @sender_workspace
     )
     tools = @toolset.tools
-    @chat.with_tools(*tools, replace: true)
+    @chat.with_tools(nil).with_tools(*tools)
   end
   
   ##
@@ -302,7 +303,7 @@ class ChatStreamJob < AsyncQueueJob
     parts << build_linking_instructions
 
     instructions = parts.compact.join("\n\n")
-    @chat.with_instructions(instructions, replace: true)
+    @chat.with_instructions(instructions)
   end
   
   ##

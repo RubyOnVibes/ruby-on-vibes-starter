@@ -91,7 +91,7 @@ The LLM receives structured JSON instead of ad-hoc strings.
 
 ## Schema DSL
 
-RecordContext uses [RubyLLM::Schema](https://github.com/danielfriis/ruby_llm-schema) for schema definitions.
+RecordContext uses [Schematist](https://github.com/crmne/schematist) for schema definitions.
 
 ### Primitive Types
 
@@ -375,5 +375,5 @@ end
 ## Resources
 
 - [RubyLLM Documentation](https://ruby-llm.com)
-- [RubyLLM::Schema DSL](https://github.com/danielfriis/ruby_llm-schema)
+- [Schematist schema DSL](https://github.com/crmne/schematist)
 - [JSON Schema Spec](https://json-schema.org/)

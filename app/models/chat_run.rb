@@ -96,13 +96,12 @@ class ChatRun < ApplicationRecord
         # Clean up orphaned tool calls to prevent RubyLLM validation errors
         # When we cancel mid-tool-execution, RubyLLM expects tool result messages
         # but we skip them, so we must clean up the tool_calls entirely
-        orphaned_tool_calls = ToolCall.where(message_id: processing_message.id)
+        orphaned_tool_calls = processing_message.ruby_llm_tool_calls
         if orphaned_tool_calls.any?
-          tool_call_record_ids = orphaned_tool_calls.pluck(:id)
           Rails.logger.info "[ChatRun] Deleting #{orphaned_tool_calls.count} orphaned tool calls"
 
-          # Delete tool messages BEFORE destroying ToolCall records (prevents FK issues)
-          chat.messages.where(role: 'tool', tool_call_id: tool_call_record_ids).destroy_all
+          # Delete tool result messages before their tool-call records.
+          orphaned_tool_calls.includes(:result).filter_map(&:result).each(&:destroy!)
           orphaned_tool_calls.destroy_all
         end
         
@@ -148,4 +147,3 @@ class ChatRun < ApplicationRecord
     Rails.logger.error e.backtrace.first(5).join("\n")
   end
 end
-

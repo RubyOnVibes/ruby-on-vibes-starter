@@ -61,8 +61,9 @@ RSpec.describe "Chats#clear", type: :request do
     it 'deletes messages with tool calls and mentions' do
       # Create assistant message with a tool call
       assistant_msg = chat.messages.create!(role: "assistant", content: "Let me check that.", user: alice, member: member)
-      tool_call = ToolCall.create!(message: assistant_msg, name: "echo_agent_task", tool_call_id: "call_123", arguments: "{}")
-      tool_msg = chat.messages.create!(role: "tool", content: '{"result":"ok"}', tool_call_id: tool_call.id)
+      tool_call = assistant_msg.ruby_llm_tool_calls.create!(name: "echo_agent_task", tool_call_id: "call_123", arguments: {})
+      tool_msg = chat.messages.create!(role: "tool", content: '{"result":"ok"}')
+      tool_call.update!(result: tool_msg)
 
       # Create user message with a mention
       user_msg = chat.messages.create!(role: "user", content: "Check @agent", user_submitted: true, user: alice, member: member)
@@ -71,7 +72,7 @@ RSpec.describe "Chats#clear", type: :request do
       expect {
         post clear_chat_path(chat)
       }.to change { chat.messages.count }.to(0)
-       .and change { ToolCall.where(message_id: [assistant_msg.id, tool_msg.id]).count }.to(0)
+       .and change { RubyLLM::ActiveRecord::ToolCall.where(message: assistant_msg).count }.to(0)
        .and change { Mention.where(message_id: user_msg.id).count }.to(0)
 
       expect(response).to have_http_status(:no_content)

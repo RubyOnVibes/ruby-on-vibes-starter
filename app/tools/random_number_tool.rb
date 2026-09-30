@@ -12,7 +12,7 @@ class RandomNumberTool < RubyLLM::Tool
     Examples: "roll a d20", "pick a number between 1 and 100", "flip a coin"
   DESC
 
-  params do
+  parameters do
     integer :min, description: "Minimum value (inclusive, default: 1)", required: false
     integer :max, description: "Maximum value (inclusive, default: 100)", required: false
     integer :count, description: "How many random numbers to generate (default: 1, max: 20)", required: false

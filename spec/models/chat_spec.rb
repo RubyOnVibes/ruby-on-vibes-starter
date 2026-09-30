@@ -61,26 +61,24 @@ RSpec.describe Chat, type: :model do
           user_submitted: false
         )
 
-        tc1 = ToolCall.create!(
-          message: assistant_msg,
+        tc1 = assistant_msg.ruby_llm_tool_calls.create!(
           tool_call_id: "call_1",
           name: "search",
-          arguments: "{}"
+          arguments: {}
         )
-        tc2 = ToolCall.create!(
-          message: assistant_msg,
+        assistant_msg.ruby_llm_tool_calls.create!(
           tool_call_id: "call_2",
           name: "read_file",
-          arguments: "{}"
+          arguments: {}
         )
 
         # Only 1 of 2 tool results arrived (simulates crash mid-execution)
-        chat.messages.create!(
+        tool_result = chat.messages.create!(
           role: :tool,
           content: "search result",
-          tool_call_id: tc1.id,
           user_submitted: false
         )
+        tc1.update!(result: tool_result)
 
         result = chat.recover_from_tool_errors!
 
@@ -94,7 +92,6 @@ RSpec.describe Chat, type: :model do
         orphaned_msg = chat.messages.create!(
           role: :tool,
           content: "orphaned result",
-          tool_call_id: nil,
           user_submitted: false
         )
 
@@ -110,7 +107,6 @@ RSpec.describe Chat, type: :model do
         chat.messages.create!(
           role: :tool,
           content: "already skipped",
-          tool_call_id: nil,
           user_submitted: false,
           skip_llm_context: true
         )
@@ -159,19 +155,19 @@ RSpec.describe Chat, type: :model do
     end
 
     it 'preserves tool role messages even if content is empty' do
-      tc = ToolCall.create!(
-        message: chat.messages.create!(role: :assistant, content: "use tool", user_submitted: false),
+      assistant_message = chat.messages.create!(role: :assistant, content: "use tool", user_submitted: false)
+      tc = assistant_message.ruby_llm_tool_calls.create!(
         tool_call_id: "call_keep",
         name: "test",
-        arguments: "{}"
+        arguments: {}
       )
 
       tool_msg = chat.messages.create!(
         role: :tool,
         content: "",
-        tool_call_id: tc.id,
         user_submitted: false
       )
+      tc.update!(result: tool_msg)
 
       messages = chat.messages.where(id: tool_msg.id)
       filtered = chat.order_messages_for_llm(messages)

@@ -25,7 +25,7 @@ class WebFetchTool < RubyLLM::Tool
     - Very large pages are truncated to keep responses manageable
   DESC
 
-  params do
+  parameters do
     string :url, description: "The URL to fetch (must start with http:// or https://)", required: true
   end
 

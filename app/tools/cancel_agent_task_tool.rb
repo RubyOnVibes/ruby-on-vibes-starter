@@ -9,7 +9,7 @@
 class CancelAgentTaskTool < RubyLLM::Tool
   description "Cancel a running or pending agent task in this chat."
 
-  params do
+  parameters do
     string :task_id, description: "The agent task ID to cancel (e.g. agent_task_xxx)", required: true
   end
 

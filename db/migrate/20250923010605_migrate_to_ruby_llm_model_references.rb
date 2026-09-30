@@ -1,8 +1,8 @@
 class MigrateToRubyLlmModelReferences < ActiveRecord::Migration[8.0]
   def up
-    model_class = Model
-    chat_class = Chat
-    message_class = Message
+    model_class = migration_record(:models)
+    chat_class = migration_record(:chats)
+    message_class = migration_record(:messages)
 
 
     # Then check for any models in existing data that aren't in models.json
@@ -133,6 +133,13 @@ class MigrateToRubyLlmModelReferences < ActiveRecord::Migration[8.0]
       model_class.find_by(model_id: model_info.id, provider: model_info.provider)
     rescue => e
       model_class.find_by(model_id: model_id)
+    end
+  end
+
+  def migration_record(table)
+    Class.new(ActiveRecord::Base) do
+      self.table_name = table.to_s
+      self.inheritance_column = :_type_disabled
     end
   end
 end

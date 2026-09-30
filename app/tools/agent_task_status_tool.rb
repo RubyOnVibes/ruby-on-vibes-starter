@@ -18,7 +18,7 @@ class AgentTaskStatusTool < RubyLLM::Tool
   description "Check the status, progress, result, and side effects of an agent task in this chat. " \
               "Use this to inspect what a task did (records created, updated, deleted, files attached, etc.)."
 
-  params do
+  parameters do
     string :task_id, description: "The agent task ID (e.g. agent_task_xxx)", required: true
   end
 

@@ -81,20 +81,9 @@ class ChatsController < ApplicationController
     @chat.transaction do
       @chat.update!(agent_tasks_dismissed_at: Time.current, compaction_summary: nil, last_compacted_at: nil)
 
-      message_ids = @chat.message_ids
-
-      # Break circular FK: messages.tool_call_id → tool_calls
-      @chat.messages.where.not(tool_call_id: nil).update_all(tool_call_id: nil)
-
-      # Now safe to delete tool_calls (no messages reference them)
-      ToolCall.where(message_id: message_ids).delete_all
-
-      # Delete message dependents
-      Mention.where(message_id: message_ids).delete_all
-      ActiveStorage::Attachment.where(record_type: "Message", record_id: message_ids).delete_all
-
-      # Delete messages and chat runs
-      @chat.messages.delete_all
+      # Destroy messages so RubyLLM usage/tool-call records and application
+      # attachments/mentions are cleaned up through their associations.
+      @chat.messages.destroy_all
       @chat.chat_runs.delete_all
     end
 

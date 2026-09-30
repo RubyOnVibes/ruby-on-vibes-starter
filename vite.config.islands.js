@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import path from 'path'
-import fs from 'fs'
 
 // IslandJS Rails - Islands Architecture Build Configuration
 // This config builds React components as IIFE bundles for use in ERB templates
@@ -24,7 +23,7 @@ export default defineConfig({
   build: {
     // Library mode for IIFE output
     lib: {
-      entry: path.resolve(__dirname, 'app/javascript/entrypoints/islands.js'),
+      entry: path.resolve(import.meta.dirname, 'app/javascript/entrypoints/islands.js'),
       name: 'islandjsRails',
       formats: ['iife'],
       // Don't specify fileName here - let rollupOptions handle it
@@ -55,7 +54,7 @@ export default defineConfig({
   
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'app/javascript')
+      '@': path.resolve(import.meta.dirname, 'app/javascript')
     }
   }
 })

@@ -27,7 +27,7 @@ module Examples
                 "Use this to verify agent tasks are working correctly. " \
                 "Takes an optional message and duration."
 
-    params do
+    parameters do
       string :message, description: "A message to echo back in the result (default: 'Hello from EchoAgentTask')", required: false
       integer :duration, description: "How long the task should run in seconds (default: 10, max: 60)", required: false
     end

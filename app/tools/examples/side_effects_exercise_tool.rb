@@ -30,7 +30,7 @@ module Examples
                 "Also spawns an echo subtask to prove the subtask pattern. " \
                 "Use this to verify the full agent task effects pipeline end-to-end."
 
-    params do
+    parameters do
       integer :step_delay, description: "Seconds to pause between each step for visibility (default: 1, max: 5)", required: false
     end
 

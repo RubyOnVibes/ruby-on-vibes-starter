@@ -20,7 +20,7 @@ class Chat < ApplicationRecord
       next false if msg.role.to_s == 'system'
       next false if msg.content.present?
       next false if msg.role.to_s == 'tool'
-      next false if msg.role.to_s == 'assistant' && msg.tool_calls.exists?
+      next false if msg.role.to_s == 'assistant' && msg.ruby_llm_tool_calls.exists?
       true
     end
 
@@ -37,8 +37,15 @@ class Chat < ApplicationRecord
       end
     end
 
-    super(deduped)
+    deduped
   end
+
+  # RubyLLM 2.0 owns message ordering internally, so filter the fully-loaded
+  # persisted history at the point where it is synchronized into the chat.
+  def eager_load_messages
+    order_messages_for_llm(super)
+  end
+  private :eager_load_messages
 
   ##
   # Recover from incomplete tool call chains left by crashed processes.
@@ -64,18 +71,18 @@ class Chat < ApplicationRecord
 
     # Pass 1: Assistant messages with incomplete tool chains
     self.messages.where(role: 'assistant', skip_llm_context: false)
-        .joins(:tool_calls)
+        .joins(:ruby_llm_tool_calls)
         .distinct
         .each do |assistant_msg|
-      tool_call_db_ids = assistant_msg.tool_calls.pluck(:id)
-      expected_count = tool_call_db_ids.size
-      actual_count = self.messages.where(role: 'tool', tool_call_id: tool_call_db_ids).count
+      tool_calls = assistant_msg.ruby_llm_tool_calls.includes(:result).to_a
+      result_messages = tool_calls.filter_map(&:result)
+      expected_count = tool_calls.size
+      actual_count = result_messages.size
 
       next if actual_count == expected_count
 
       assistant_msg.update_columns(skip_llm_context: true)
-      self.messages.where(role: 'tool', tool_call_id: tool_call_db_ids)
-          .update_all(skip_llm_context: true)
+      self.messages.where(id: result_messages.map(&:id)).update_all(skip_llm_context: true)
 
       # Also mark the triggering user message
       prev_msg = self.messages.where('id < ?', assistant_msg.id).order(id: :desc).first
@@ -89,9 +96,10 @@ class Chat < ApplicationRecord
         "msg #{assistant_msg.id} (#{actual_count}/#{expected_count} results)"
     end
 
-    # Pass 2: Orphaned tool result messages (parent_tool_call was destroyed,
-    # e.g. by ChatRun cancel cleanup, leaving tool_call_id = nil)
-    orphaned = self.messages.where(role: 'tool', tool_call_id: nil, skip_llm_context: false)
+    # Pass 2: Orphaned tool result messages (parent tool call was destroyed,
+    # e.g. by ChatRun cancel cleanup).
+    orphaned = self.messages.where(role: 'tool', skip_llm_context: false)
+      .where.missing(:ruby_llm_parent_tool_call)
     if orphaned.exists?
       count = orphaned.update_all(skip_llm_context: true)
       recovered = true
@@ -239,13 +247,10 @@ class Chat < ApplicationRecord
   #
   def cleanup_orphaned_tool_messages!
     self.messages.where(role: 'tool', skip_llm_context: false).find_each do |tool_msg|
-      next unless tool_msg.tool_call_id
-
-      tool_call_record = tool_msg.parent_tool_call
+      tool_call_record = tool_msg.ruby_llm_parent_tool_call
       unless tool_call_record
-        # tool_call_id is set but record is gone (destroyed by cancel!)
         tool_msg.update_column(:skip_llm_context, true)
-        Rails.logger.warn "[Chat##{id}] Tool message #{tool_msg.id} orphaned (ToolCall destroyed)."
+        Rails.logger.warn "[Chat##{id}] Tool message #{tool_msg.id} orphaned (tool call destroyed)."
         next
       end
 
@@ -256,7 +261,7 @@ class Chat < ApplicationRecord
       # this tool msg is orphaned. Assistant messages with tool_calls legitimately
       # have empty content — that's normal, not filtered.
       parent_filtered = parent_assistant.skip_llm_context? ||
-                        (parent_assistant.content.to_s.strip.empty? && !parent_assistant.tool_calls.exists?)
+                        (parent_assistant.content.to_s.strip.empty? && !parent_assistant.ruby_llm_tool_calls.exists?)
 
       if parent_filtered
         Rails.logger.warn "[Chat##{id}] Tool message #{tool_msg.id} orphaned " \

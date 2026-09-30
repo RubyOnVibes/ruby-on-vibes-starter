@@ -5,7 +5,7 @@ module Madmin
     impersonates :user
 
     def refresh_models
-      Model.refresh!
+      RubyLLM.models.refresh
       redirect_to "/admin/models", notice: "LLMs refreshed successfully"
     end
 

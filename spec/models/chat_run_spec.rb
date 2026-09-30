@@ -131,11 +131,10 @@ RSpec.describe ChatRun, type: :model do
         allow_any_instance_of(Message).to receive(:broadcast_full_replace!)
 
         # Create tool calls on the assistant message
-        tc = ToolCall.create!(
-          message: msg,
+        tc = msg.ruby_llm_tool_calls.create!(
           tool_call_id: "call_abc123",
           name: "search",
-          arguments: "{}"
+          arguments: {}
         )
 
         run.cancel!

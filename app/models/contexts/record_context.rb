@@ -16,13 +16,13 @@ class RecordContext
     
     ##
     # Define the schema for this context
-    # Delegates to RubyLLM::Schema DSL
+    # Delegates to the Schematist schema DSL used by RubyLLM.
     #
     def schema(&block)
       # Capture context class name outside the block
       context_name = name&.sub('Context', '') || 'Record'
       
-      @schema_class ||= Class.new(RubyLLM::Schema) do
+      @schema_class ||= Class.new(Schematist::Schema) do
         # Set schema name based on context class
         name context_name
       end
@@ -61,10 +61,9 @@ class RecordContext
   def validate!
     schema_class = self.class.schema_class
     
-    # RubyLLM::Schema doesn't have built-in validation yet,
+    # Schematist handles the schema shape; record-specific validation stays here.
     # but we can check required fields
-    json_schema = schema_class.new.to_json_schema
-    required = json_schema.dig(:schema, :required) || []
+    required = to_json_schema.dig(:schema, :required) || []
     
     required.each do |field|
       unless @data.key?(field) || @data.key?(field.to_sym)
@@ -80,7 +79,12 @@ class RecordContext
   # Used by LLM for understanding structure
   #
   def to_json_schema
-    self.class.schema_class.new.to_json_schema
+    raw = self.class.schema_class.new.to_json_schema.deep_symbolize_keys
+    {
+      name: raw.delete(:title),
+      description: raw.delete(:description),
+      schema: raw.except(:"$schema")
+    }
   end
   
   ##

@@ -10,7 +10,7 @@ class ListAgentTasksTool < RubyLLM::Tool
   description "List agent tasks in this chat. Returns task IDs, kinds, statuses, and summaries. " \
               "Use this to check what tasks have been run, are running, or have completed."
 
-  params do
+  parameters do
     string :status, description: "Filter by status: pending, running, completed, failed, cancelled, awaiting_approval, or 'all' (default: all)", required: false
     string :kind, description: "Filter by task kind (e.g. 'customer_analysis')", required: false
     integer :limit, description: "Maximum number of tasks to return (default: 20)", required: false
