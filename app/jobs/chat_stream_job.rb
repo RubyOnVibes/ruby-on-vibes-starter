@@ -10,7 +10,8 @@ class ChatStreamJob < AsyncQueueJob
   # options may include sender_member_id and sender_user_id for continuation context.
   def perform(chat_id, user_msg_id, chat_run_id, options = {})
     @options = options.is_a?(Hash) ? options.symbolize_keys : {}
-    @continuation_mode = user_msg_id.nil?
+    @task_continuation = @options[:task_continuation] == true
+    @approval_resume = @options[:approval_resume] == true
     @chat_run = ChatRun.find(chat_run_id)
     setup_chat(chat_id, user_msg_id)
 
@@ -19,11 +20,19 @@ class ChatStreamJob < AsyncQueueJob
 
     # Recover from incomplete tool chains left by previous crashed runs.
     # Must run before streaming — broken chains cause API errors.
-    @chat.recover_from_tool_errors!
+    @chat.recover_from_tool_errors! unless @approval_resume
 
     @chat_run.update!(status: :running)
     stream_response
     return if stopped?
+
+    # RubyLLM deliberately parks the completion loop before executing a tool
+    # declared with `requires_approval`. Persist enough metadata for an
+    # authorized human to decide it from any process, then leave this ChatRun
+    # active until the controller resumes it.
+    if park_for_tool_approval!
+      return @chat_run
+    end
 
     # Decide whether to enter awaiting_tasks or complete.
     #
@@ -47,7 +56,7 @@ class ChatStreamJob < AsyncQueueJob
       else
         @chat_run.transition_to_awaiting_tasks!
       end
-    elsif !@continuation_mode && tasks_during_run.exists?
+    elsif !@task_continuation && tasks_during_run.exists?
       # Initial run: tasks created and already completed — auto-continue to summarize
       @chat_run.transition_to_awaiting_tasks!
     else
@@ -110,6 +119,8 @@ class ChatStreamJob < AsyncQueueJob
       persist_error_message("Error: #{e.message}")
     end
     raise
+  ensure
+    capture_and_publish_usage
   end
 
   private
@@ -155,7 +166,7 @@ class ChatStreamJob < AsyncQueueJob
     # materialize RubyLLM's cached conversation. Anthropic requires the history
     # to end with a user message, and RubyLLM 2.0 does not automatically reload
     # messages added after the chat object has been built.
-    if @continuation_mode
+    if @task_continuation
       @chat.messages.create!(
         role: :user,
         content: "My background tasks have finished. Please check the results and let me know what happened.",
@@ -165,6 +176,7 @@ class ChatStreamJob < AsyncQueueJob
     end
 
     add_tools
+    add_model_resilience
     add_instructions
     add_new_message_callback
   end
@@ -254,6 +266,19 @@ class ChatStreamJob < AsyncQueueJob
     tools = @toolset.tools
     @chat.with_tools(nil).with_tools(*tools)
   end
+
+  # Optional resilience features are explicit environment opt-ins. Keeping
+  # these disabled by default prevents surprising provider or billing changes.
+  def add_model_resilience
+    fallback_models = ENV.fetch("LLM_FALLBACK_MODELS", "")
+      .split(",")
+      .map(&:strip)
+      .reject(&:blank?)
+    @chat.with_fallbacks(*fallback_models) if fallback_models.any?
+
+    @prompt_caching = ENV["LLM_PROMPT_CACHING"] == "true"
+    @chat.with_caching if @prompt_caching
+  end
   
   ##
   # Inject dynamic context into chat instructions
@@ -270,40 +295,53 @@ class ChatStreamJob < AsyncQueueJob
   def add_instructions
     validate_mentionable_contexts
 
-    parts = []
+    stable_parts = [assistant_identity]
+    dynamic_parts = []
 
-    # Core assistant identity — use agent instructions if chat belongs to an agent
-    parts << core_instructions
+    # Compaction changes as the conversation grows, so it must remain outside
+    # the reusable prompt-cache prefix.
+    dynamic_parts << @chat.compaction_summary if @chat.compaction_summary.present?
 
     # Continuation directive: inject specific task results so the LLM
     # summarizes only the tasks from this run (not all historical tasks).
-    if @continuation_mode
-      parts << build_continuation_directive
+    if @task_continuation
+      dynamic_parts << build_continuation_directive
     end
 
     # Tools (if any)
     if @toolset.tools.any?
-      parts << "You have tools available: #{@toolset.tools.map(&:name).join(', ')}"
+      stable_parts << "You have tools available: #{@toolset.tools.map(&:name).join(', ')}"
     end
 
     # User's explicit @mentions - this IS content the user referenced
     if @user_msg&.mentions&.any?
-      parts << build_mentions_context
+      dynamic_parts << build_mentions_context
     end
 
     # Agent task awareness - history summary + recently completed results
     if (agent_tasks_context = build_agent_tasks_context)
-      parts << agent_tasks_context
+      dynamic_parts << agent_tasks_context
     end
 
     # Environment metadata (workspace, participants) - NOT user content
-    parts << build_environment_context
+    dynamic_parts << build_environment_context
 
     # Linking instructions (condensed)
-    parts << build_linking_instructions
+    dynamic_parts << build_linking_instructions
 
-    instructions = parts.compact.join("\n\n")
-    @chat.with_instructions(instructions)
+    if @prompt_caching
+      # Keep a stable, persisted prefix with an explicit provider cache
+      # boundary. Per-turn context is reconstructed in memory and never
+      # accumulates as stale system messages in the transcript.
+      @chat.with_instructions(
+        stable_parts.compact.join("\n\n"),
+        cache_until_here: true
+      )
+      dynamic_instructions = dynamic_parts.compact.join("\n\n")
+      @chat.with_instructions(dynamic_instructions, append: true, persist: false) if dynamic_instructions.present?
+    else
+      @chat.with_instructions((stable_parts + dynamic_parts).compact.join("\n\n"))
+    end
   end
   
   ##
@@ -311,22 +349,12 @@ class ChatStreamJob < AsyncQueueJob
   # If the chat belongs to an agent, use the agent's resolved instructions.
   # Otherwise, use the default assistant identity.
   #
-  def core_instructions
-    parts = []
-
-    # Compaction summary (compressed history from older messages)
-    if @chat.compaction_summary.present?
-      parts << @chat.compaction_summary
-    end
-
-    # Agent or default identity
+  def assistant_identity
     if (agent = @chat.agent)
-      parts << agent.resolved_instructions
+      agent.resolved_instructions
     else
-      parts << "You are a helpful assistant."
+      "You are a helpful assistant."
     end
-
-    parts.join("\n\n")
   end
 
   ##
@@ -625,6 +653,52 @@ class ChatStreamJob < AsyncQueueJob
     end
 
     Rails.logger.info "[ChatStreamJob] 🏁 Streaming complete: #{@chunk_count} chunks, #{@accumulated.length} chars"
+  end
+
+  def park_for_tool_approval!
+    return false unless @chat.awaiting_approval?
+
+    requested_at = Time.current.iso8601
+    @chat.pending_approvals.each do |tool_call|
+      tool_call.update!(
+        metadata: tool_call.metadata.merge(
+          "requires_approval" => true,
+          "chat_run_id" => @chat_run.id,
+          "requester_member_id" => @sender_member&.id,
+          "requester_user_id" => @sender_user&.id,
+          "requested_at" => requested_at
+        )
+      )
+      tool_call.message.broadcast_upsert_to_chat! if tool_call.message.respond_to?(:broadcast_upsert_to_chat!)
+    end
+
+    @chat_run.transition_to_awaiting_approval!
+    true
+  end
+
+  def capture_and_publish_usage
+    return unless @chat_run
+
+    summary = @chat_run.capture_usage!
+    return if summary["attempts"].to_i.zero?
+
+    message = if @llm_msg && Message.exists?(@llm_msg.id)
+      @llm_msg.reload
+    elsif @chat
+      @chat.messages.where(role: :assistant)
+        .where("created_at >= ?", @chat_run.created_at)
+        .order(:id)
+        .last
+    end
+    return unless message
+
+    message.update_columns(
+      metadata: (message.metadata || {}).merge("run_usage" => summary),
+      updated_at: Time.current
+    )
+    message.broadcast_upsert_to_chat!
+  rescue => e
+    Rails.logger.error "[ChatStreamJob] Usage capture failed: #{e.class} - #{e.message}"
   end
   
   def extract_chunk_text(chunk)

@@ -81,6 +81,10 @@ class ToolsetService
       end
     end
 
+    # Keep the approval example independent from background-agent features so
+    # applications can adopt human-in-the-loop tools without enabling tasks.
+    tools << Examples::RenameChatTool if RubyOnVibes.debug_tools?
+
     tools
   end
 

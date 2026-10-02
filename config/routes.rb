@@ -63,6 +63,8 @@ Rails.application.routes.draw do
     member do
       post :cancel
       post :continue
+      post "tool_approvals/:tool_call_id/approve", action: :approve_tool, as: :approve_tool
+      post "tool_approvals/:tool_call_id/deny", action: :deny_tool, as: :deny_tool
     end
   end
 

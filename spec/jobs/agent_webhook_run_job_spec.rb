@@ -19,13 +19,18 @@ RSpec.describe AgentWebhookRunJob, type: :job do
   end
 
   let(:task) do
+    trigger_message = agent.chat.messages.create!(
+      role: :user,
+      content: "Webhook received: push",
+      user_submitted: false
+    )
     AgentTask.create!(
       chat: agent.chat,
       workspace: workspace,
       member: member,
       kind: "webhook_run",
       trigger: "webhook",
-      metadata: { webhook_payload: { event: "push" } }
+      metadata: { webhook_payload: { event: "push" }, trigger_message_id: trigger_message.id }
     )
   end
 
@@ -50,9 +55,11 @@ RSpec.describe AgentWebhookRunJob, type: :job do
   it 'enqueues a ChatStreamJob with correct args' do
     described_class.new.perform(agent.id, task.id)
 
+    trigger_message_id = task.metadata["trigger_message_id"]
+
     expect(ChatStreamJob).to have_received(:perform_later).with(
       agent.chat.id,
-      nil,
+      trigger_message_id,
       anything,
       hash_including(sender_member_id: member.id, sender_user_id: member.user_id)
     )

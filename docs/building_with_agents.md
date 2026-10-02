@@ -79,6 +79,45 @@ def tool_classes
 end
 ```
 
+### Human approval for writes
+
+Reading data and changing data are different trust boundaries. Any tool that
+sends, publishes, charges, deletes, or mutates important records should declare
+`requires_approval` and still enforce authorization inside `execute`:
+
+```ruby
+class PublishPostTool < RubyLLM::Tool
+  description "Publish a reviewed draft"
+  requires_approval
+
+  parameters do
+    integer :post_id, required: true
+  end
+
+  def initialize(chat:, sender_member:, **)
+    @chat = chat
+    @sender_member = sender_member
+  end
+
+  def execute(post_id:)
+    post = @sender_member.workspace.posts.find(post_id)
+    raise Pundit::NotAuthorizedError unless PostPolicy.new(@sender_member, post).publish?
+
+    post.update!(published_at: Time.current)
+    { published: true, post_id: post.id }
+  end
+end
+```
+
+The chat loop persists the pending call, parks its `ChatRun` in
+`awaiting_approval`, and renders the exact arguments. Approval or denial can
+survive a refresh or process restart. Approval is consent to attempt the action,
+not authorization: scope records and check permissions again inside the tool.
+Make writes idempotent because any background system can retry after failure.
+
+`Examples::RenameChatTool` is a reversible reference implementation available
+with `VIBES_DEBUG_TOOLS=true`.
+
 ### 2. Agent Tasks (Background, Long-Running)
 
 Agent tasks run in **SolidQueue** (or Sidekiq) — a separate worker process, not a fiber.
@@ -221,6 +260,29 @@ track_effect("notified", target: user, description: "Sent Slack notification")
 track_enqueue_subtask(DataExportJob, kind: "data_export",
                       metadata: { format: "csv" })
 ```
+
+## Run usage, prompt caching, and fallbacks
+
+Each `ChatRun` snapshots RubyLLM's persisted usage ledger, including physical
+retry attempts, input/output/cache tokens, and cost when pricing is known. The
+final assistant message shows a compact usage line. Unknown cost remains blank;
+it is never converted to a misleading zero.
+
+Two resilience features are opt-in:
+
+```env
+LLM_PROMPT_CACHING=true
+LLM_FALLBACK_MODELS=gpt-5-nano,claude-haiku-4-5
+```
+
+When caching is enabled, stable assistant/agent instructions form the cached
+prefix. Mentions, participants, task results, compaction summaries, and other
+per-turn context remain outside that prefix. Provider cache minimums still
+apply, so confirm cache hits through `ChatRun#cache_read_tokens`.
+
+Fallbacks apply only to RubyLLM's supported transient failure classes. Configure
+credentials for every listed model and choose models that support the tools and
+modalities your conversation uses.
 
 ## Decision Guide: Tool or Agent Task?
 

@@ -11,4 +11,3 @@ class AddMemberToChats < ActiveRecord::Migration[8.0]
     add_index :messages, [:chat_id, :ai_processing], unique: true, where: "ai_processing = true"
   end
 end
-

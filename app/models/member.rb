@@ -11,6 +11,11 @@ class Member < ApplicationRecord
   has_many :owned_chats, class_name: 'Chat', foreign_key: 'member_id', dependent: :destroy
   has_many :chat_members, dependent: :destroy
   has_many :chats, through: :chat_members  # All chats this member can access
+  has_many :initiated_chat_runs,
+    class_name: "ChatRun",
+    foreign_key: :initiated_by_member_id,
+    dependent: :nullify,
+    inverse_of: :initiated_by_member
   
   # Chat invitations
   has_many :sent_chat_invitations, class_name: 'ChatInvitation', foreign_key: 'inviter_id', dependent: :destroy

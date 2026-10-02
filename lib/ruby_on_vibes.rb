@@ -190,7 +190,7 @@ module RubyOnVibes
   # Debug/demo tools (echo task, failing task) for verifying the agent task pipeline.
   # Enabled in dev/test by default. Set VIBES_DEBUG_TOOLS=true in production to enable.
   def self.debug_tools?
-    Rails.env.development? || Rails.env.test? || ENV["VIBES_DEBUG_TOOLS"].present?
+    Rails.env.development? || Rails.env.test? || ENV["VIBES_DEBUG_TOOLS"] == "true"
   end
 
   # Email provider detection helpers

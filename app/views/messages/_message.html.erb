@@ -20,6 +20,7 @@
       }
     },
     attachments: message.serialize_attachments,
+    tool_calls: message.serialize_tool_calls,
     metadata: message.metadata || {},
     user: message.serialize_user,
     compacted: message.compacted,

@@ -50,9 +50,11 @@ RSpec.describe AgentScheduledRunJob, type: :job do
   it 'enqueues a ChatStreamJob' do
     described_class.new.perform(agent.id)
 
+    trigger_message = agent.chat.messages.order(:id).last
+
     expect(ChatStreamJob).to have_received(:perform_later).with(
       agent.chat.id,
-      nil,
+      trigger_message.id,
       anything,
       hash_including(sender_member_id: member.id, sender_user_id: member.user_id)
     )

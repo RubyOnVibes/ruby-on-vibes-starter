@@ -26,11 +26,17 @@ class AgentWebhookRunJob < SolidQueueJob
     end
 
     # Create a ChatRun and trigger the chat stream
-    chat_run = chat.chat_runs.create!(status: :pending)
+    chat_run = chat.chat_runs.create!(status: :pending, initiated_by_member: member)
+    trigger_message_id = task.metadata["trigger_message_id"] || task.metadata[:trigger_message_id]
+    trigger_message_id ||= chat.messages
+      .where(role: :user, user_submitted: false)
+      .where(created_at: ..task.created_at)
+      .order(:id)
+      .last&.id
 
     ChatStreamJob.perform_later(
       chat.id,
-      nil,  # no user message (continuation-style)
+      trigger_message_id,
       chat_run.id,
       { sender_member_id: member.id, sender_user_id: member.user_id }
     )

@@ -100,7 +100,7 @@ class MessagesController < ApplicationController
 
     Rails.logger.info "[MessagesController] 🎬 Creating ChatRun for chat #{@chat.id}"
     begin
-      @chat_run = @chat.chat_runs.create!(status: :pending)
+      @chat_run = @chat.chat_runs.create!(status: :pending, initiated_by_member: current_member)
       Rails.logger.info "[MessagesController] ✅ ChatRun created: ID=#{@chat_run.id}, status=#{@chat_run.status}"
     rescue ActiveRecord::RecordNotUnique => e
       # Duplicate detected (chat already processing) - fail gracefully

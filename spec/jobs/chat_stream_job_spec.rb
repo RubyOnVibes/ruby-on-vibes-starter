@@ -58,7 +58,9 @@ RSpec.describe ChatStreamJob, type: :job do
     callbacks = {
       with_tools_calls: 0,
       with_instructions_calls: 0,
-      system_messages_seen_by_with_tools: []
+      system_messages_seen_by_with_tools: [],
+      with_caching_calls: 0,
+      fallback_models: []
     }
     allow_any_instance_of(Chat).to receive(:before_message) { |_, &blk| callbacks[:before_message] = blk }
     allow_any_instance_of(Chat).to receive(:before_tool_call) { |_, &blk| callbacks[:before_tool_call] = blk }
@@ -74,6 +76,16 @@ RSpec.describe ChatStreamJob, type: :job do
       callbacks[:with_instructions_calls] += 1
       instance
     end
+    allow_any_instance_of(Chat).to receive(:with_caching) do |instance, *_args|
+      callbacks[:with_caching_calls] += 1
+      instance
+    end
+    allow_any_instance_of(Chat).to receive(:with_fallbacks) do |instance, *models|
+      callbacks[:fallback_models] = models
+      instance
+    end
+    allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(false)
+    allow_any_instance_of(Chat).to receive(:pending_approvals).and_return([])
     callbacks
   end
 
@@ -318,6 +330,7 @@ RSpec.describe ChatStreamJob, type: :job do
         described_class.perform_now(chat.id, nil, run.id, {
           sender_member_id: alice_member.id,
           sender_user_id: alice.id,
+          task_continuation: true,
           continuation_depth: 1
         })
       }.to change { chat.messages.where(role: :user, user_submitted: false).count }.by(1)
@@ -388,10 +401,79 @@ RSpec.describe ChatStreamJob, type: :job do
       described_class.perform_now(chat.id, nil, run.id, {
         sender_member_id: members(:alice_personal_member).id,
         sender_user_id: users(:alice).id,
+        task_continuation: true,
         continuation_depth: 5
       })
 
       expect(run.reload.status).to eq("completed")
+    end
+  end
+
+  describe "tool approval parking" do
+    it "parks the run and marks pending tool calls for an authorized decision" do
+      run = create_chat_run!
+      assistant = chat.messages.create!(role: :assistant, content: "")
+      tool_call = assistant.ruby_llm_tool_calls.create!(
+        tool_call_id: "approval_call_1",
+        name: "examples__rename_chat",
+        arguments: { title: "Approved title" }
+      )
+
+      stub_chat_streaming(chunks: [])
+      allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(true)
+      allow_any_instance_of(Chat).to receive(:pending_approvals).and_return([tool_call])
+
+      described_class.perform_now(chat.id, user_message.id, run.id)
+
+      expect(run.reload).to be_status_awaiting_approval
+      expect(tool_call.reload.metadata).to include(
+        "requires_approval" => true,
+        "chat_run_id" => run.id,
+        "requester_member_id" => user_message.member_id
+      )
+    end
+
+    it "resumes an approved tool chain without inserting a synthetic user message" do
+      run = create_chat_run!
+      callbacks = stub_chat_streaming(chunks: ["Renamed."])
+      expect_any_instance_of(Chat).not_to receive(:recover_from_tool_errors!)
+      allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(false)
+
+      expect {
+        described_class.perform_now(chat.id, nil, run.id, {
+          sender_member_id: user_message.member_id,
+          sender_user_id: user_message.user_id,
+          approval_resume: true
+        })
+      }.not_to change { chat.messages.where(role: :user, user_submitted: false).count }
+
+      expect(callbacks[:system_messages_seen_by_with_tools]).to all(eq(0))
+      expect(run.reload).to be_status_completed
+    end
+  end
+
+  describe "optional model resilience" do
+    it "enables prompt caching only when configured" do
+      run = create_chat_run!
+      callbacks = stub_chat_streaming(chunks: ["Hi"])
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("LLM_PROMPT_CACHING").and_return("true")
+
+      described_class.perform_now(chat.id, user_message.id, run.id)
+
+      expect(callbacks[:with_caching_calls]).to eq(1)
+      expect(callbacks[:with_instructions_calls]).to eq(2)
+    end
+
+    it "configures comma-separated fallback models" do
+      run = create_chat_run!
+      callbacks = stub_chat_streaming(chunks: ["Hi"])
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("LLM_FALLBACK_MODELS", "").and_return("gpt-5-nano, claude-haiku-4-5")
+
+      described_class.perform_now(chat.id, user_message.id, run.id)
+
+      expect(callbacks[:fallback_models]).to eq(["gpt-5-nano", "claude-haiku-4-5"])
     end
   end
 end

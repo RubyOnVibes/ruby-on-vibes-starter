@@ -39,7 +39,7 @@ module Api
 
         # Post a trigger message in the agent's chat with webhook context
         event_label = event_type || "external event"
-        chat.messages.create!(
+        trigger_message = chat.messages.create!(
           role: :user,
           content: "Webhook received: #{event_label}\n\n```json\n#{payload.truncate(2000)}\n```",
           user_submitted: false
@@ -55,7 +55,8 @@ module Api
           idempotency_key: idempotency_key,
           metadata: {
             webhook_event: event_type,
-            webhook_payload: (JSON.parse(payload) rescue payload.truncate(5000))
+            webhook_payload: (JSON.parse(payload) rescue payload.truncate(5000)),
+            trigger_message_id: trigger_message.id
           }
         )
 

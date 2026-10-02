@@ -32,6 +32,10 @@ class ChatPolicy < ApplicationPolicy
   def cancel_runs?
     member?
   end
+
+  def approve_tools?
+    member?
+  end
   
   def leave?
     member? && !owner?

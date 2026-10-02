@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_30_160705) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_01_000000) do
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -250,9 +250,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_160705) do
     t.string "node_name"
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.integer "initiated_by_member_id"
+    t.integer "llm_attempts", default: 0, null: false
+    t.integer "input_tokens"
+    t.integer "output_tokens"
+    t.integer "cache_read_tokens"
+    t.integer "cache_write_tokens"
+    t.integer "thinking_tokens"
+    t.decimal "total_cost", precision: 16, scale: 10
+    t.json "usage_metadata", default: {}, null: false
     t.index ["chat_id", "status"], name: "index_chat_runs_on_chat_id_and_status"
-    t.index ["chat_id"], name: "index_chat_runs_on_chat_active", unique: true, where: "status IN (0, 1, 5)"
+    t.index ["chat_id"], name: "index_chat_runs_on_chat_active", unique: true, where: "status IN (0, 1, 5, 6)"
     t.index ["chat_id"], name: "index_chat_runs_on_chat_id"
+    t.index ["initiated_by_member_id"], name: "index_chat_runs_on_initiated_by_member_id"
     t.index ["status"], name: "index_chat_runs_on_status"
   end
 
@@ -688,6 +698,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_160705) do
   add_foreign_key "chat_members", "chats"
   add_foreign_key "chat_members", "members"
   add_foreign_key "chat_runs", "chats"
+  add_foreign_key "chat_runs", "members", column: "initiated_by_member_id"
   add_foreign_key "chats", "members"
   add_foreign_key "chats", "ruby_llm_models"
   add_foreign_key "chats", "users"

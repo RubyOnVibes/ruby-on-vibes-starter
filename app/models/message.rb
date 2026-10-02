@@ -103,6 +103,7 @@ class Message < ApplicationRecord
         }
       },
       attachments: serialize_attachments,
+      tool_calls: serialize_tool_calls,
       metadata: metadata || {},
       user: serialize_user,
       compacted: compacted,
@@ -151,6 +152,25 @@ class Message < ApplicationRecord
   rescue => e
     Rails.logger.error "[Message] Failed to serialize attachments: #{e.message}"
     []
+  end
+
+  # Serialize persisted tool calls for approval cards and audit history. The
+  # approval endpoints still re-scope every id through the ChatRun and policy;
+  # this payload is presentation data, never authorization state.
+  def serialize_tool_calls
+    ruby_llm_tool_calls.order(:id).map do |tool_call|
+      metadata = tool_call.metadata || {}
+      {
+        id: tool_call.tool_call_id,
+        name: tool_call.name,
+        arguments: tool_call.arguments || {},
+        approval: tool_call.approval,
+        requiresApproval: metadata["requires_approval"] == true,
+        chatRunId: metadata["chat_run_id"],
+        requestedAt: metadata["requested_at"],
+        decidedAt: metadata["decided_at"]
+      }
+    end
   end
   
   ##

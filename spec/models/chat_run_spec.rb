@@ -15,11 +15,17 @@ RSpec.describe ChatRun, type: :model do
   end
 
   describe 'status helpers' do
-    it '#active? returns true for pending and running' do
+    it '#active? returns true for pending, running, and waiting states' do
       run = create_run!(status: :pending)
       expect(run).to be_active
 
       run.update!(status: :running)
+      expect(run).to be_active
+
+      run.update!(status: :awaiting_tasks)
+      expect(run).to be_active
+
+      run.update!(status: :awaiting_approval)
       expect(run).to be_active
     end
 
@@ -34,6 +40,76 @@ RSpec.describe ChatRun, type: :model do
 
       run2 = create_run!(status: :failed)
       expect(run2).to be_stopping
+    end
+  end
+
+  describe '#decide_tool_call!' do
+    let(:member) { members(:alice_team_member) }
+
+    it 'persists a decision and claims the resume after the last approval' do
+      run = create_run!(status: :awaiting_approval, initiated_by_member: member)
+      message = chat.messages.create!(role: :assistant, content: "", created_at: run.created_at + 1.second)
+      tool_call = message.ruby_llm_tool_calls.create!(
+        tool_call_id: "approval_1",
+        name: "examples__rename_chat",
+        arguments: { title: "New title" },
+        metadata: { requires_approval: true, requester_member_id: member.id, chat_run_id: run.id }
+      )
+
+      decided, should_resume = run.decide_tool_call!(tool_call.tool_call_id, decision: "approved", member: member)
+
+      expect(decided.reload.approval).to eq("approved")
+      expect(should_resume).to be true
+      expect(run.reload).to be_status_running
+    end
+
+    it 'waits until every parallel approval has a decision' do
+      run = create_run!(status: :awaiting_approval, initiated_by_member: member)
+      message = chat.messages.create!(role: :assistant, content: "", created_at: run.created_at + 1.second)
+      calls = 2.times.map do |index|
+        message.ruby_llm_tool_calls.create!(
+          tool_call_id: "approval_#{index}",
+          name: "examples__rename_chat",
+          arguments: { title: "Title #{index}" },
+          metadata: { requires_approval: true, requester_member_id: member.id, chat_run_id: run.id }
+        )
+      end
+
+      _, first_resume = run.decide_tool_call!(calls.first.tool_call_id, decision: "denied", member: member)
+      _, second_resume = run.decide_tool_call!(calls.second.tool_call_id, decision: "approved", member: member)
+
+      expect(first_resume).to be false
+      expect(second_resume).to be true
+    end
+  end
+
+  describe '#capture_usage!' do
+    it 'aggregates all provider attempts during the run' do
+      run = create_run!(status: :running)
+      2.times do |index|
+        RubyLLM::ActiveRecord::Usage.create!(
+          chat: chat,
+          operation: "chat",
+          provider: "anthropic",
+          model: "claude-sonnet-4-6",
+          status: index.zero? ? "failed" : "succeeded",
+          input_tokens: 100 + index,
+          output_tokens: 10 + index,
+          cache_read_tokens: index * 50,
+          total_cost: "0.001"
+        )
+      end
+
+      summary = run.capture_usage!
+
+      expect(summary).to include(
+        "attempts" => 2,
+        "input_tokens" => 201,
+        "output_tokens" => 21,
+        "cache_read_tokens" => 50,
+        "total_cost" => "0.002"
+      )
+      expect(run.reload.usage_metadata["statuses"]).to eq("failed" => 1, "succeeded" => 1)
     end
   end
 

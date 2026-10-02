@@ -12,7 +12,8 @@
 #
 # Status flow:
 #   pending → running → (completed | cancelled | failed)
-#                     → awaiting_tasks → running (continuation) → (completed | cancelled | failed)
+#                     → awaiting_tasks → running (continuation)
+#                     → awaiting_approval → running (approved/denied)
 #
 # ARCHITECTURE NOTE:
 # - ChatRun tracks JOB EXECUTION (when, status, which node)
@@ -21,7 +22,10 @@
 # - This separation allows one run to involve multiple messages (tool use, retries)
 #
 class ChatRun < ApplicationRecord
+  class ToolCallAlreadyDecided < StandardError; end
+
   belongs_to :chat
+  belongs_to :initiated_by_member, class_name: "Member", optional: true
 
   enum :status, {
     pending: 0,
@@ -29,10 +33,11 @@ class ChatRun < ApplicationRecord
     completed: 2,
     cancelled: 3,
     failed: 4,
-    awaiting_tasks: 5
+    awaiting_tasks: 5,
+    awaiting_approval: 6
   }, prefix: true
 
-  scope :active, -> { where(status: [:pending, :running, :awaiting_tasks]) }
+  scope :active, -> { where(status: [ :pending, :running, :awaiting_tasks, :awaiting_approval ]) }
   scope :for_chat, ->(chat) { where(chat: chat) }
   
   # Capture node name on creation
@@ -45,11 +50,113 @@ class ChatRun < ApplicationRecord
   after_commit :broadcast_state_change, on: [:create, :update]
 
   def active?
-    status_pending? || status_running? || status_awaiting_tasks?
+    status_pending? || status_running? || status_awaiting_tasks? || status_awaiting_approval?
   end
 
   def transition_to_awaiting_tasks!
     update!(status: :awaiting_tasks)
+  end
+
+  def transition_to_awaiting_approval!
+    update!(status: :awaiting_approval)
+  end
+
+  # Persist an approval decision and atomically claim the resume. The tool call
+  # metadata is written when ChatStreamJob parks the run, so decisions remain
+  # safe across process restarts and cannot target another chat's tool call.
+  def decide_tool_call!(tool_call_id, decision:, member:)
+    raise ArgumentError, "invalid decision" unless %w[approved denied].include?(decision.to_s)
+
+    should_resume = false
+    tool_call = nil
+
+    with_lock do
+      raise ActiveRecord::RecordNotFound unless status_awaiting_approval?
+
+      tool_call = approval_tool_calls.find { |candidate| candidate.tool_call_id == tool_call_id.to_s }
+      raise ActiveRecord::RecordNotFound unless tool_call
+      raise ActiveRecord::RecordNotFound unless tool_call.metadata["requires_approval"]
+      raise ToolCallAlreadyDecided if tool_call.approval.present?
+
+      requester_id = tool_call.metadata["requester_member_id"]&.to_i
+      unless member && (requester_id == member.id || chat.owner?(member))
+        raise Pundit::NotAuthorizedError, "not allowed to decide this tool call"
+      end
+
+      tool_call.update!(
+        approval: decision,
+        metadata: tool_call.metadata.merge(
+          "decided_by_member_id" => member.id,
+          "decided_at" => Time.current.iso8601
+        )
+      )
+
+      if pending_tool_approvals.empty?
+        update!(status: :running)
+        should_resume = true
+      end
+    end
+
+    [ tool_call, should_resume ]
+  end
+
+  def approval_tool_calls
+    message_ids = chat.messages.where("created_at >= ?", created_at).select(:id)
+
+    RubyLLM::ActiveRecord::ToolCall
+      .where(message_type: Message.polymorphic_name, message_id: message_ids)
+      .order(:id)
+      .to_a
+      .select { |tool_call| tool_call.metadata["chat_run_id"].to_i == id }
+  end
+
+  def pending_tool_approvals
+    approval_tool_calls.select do |tool_call|
+      tool_call.metadata["requires_approval"] && tool_call.approval.blank?
+    end
+  end
+
+  # Snapshot provider attempts attributable to this run. A chat can have only
+  # one active run, so the run's time window is an unambiguous accounting scope,
+  # including retries and approval/task continuations.
+  def capture_usage!
+    usages = chat.ruby_llm_usages.where("created_at >= ?", created_at).chronological.to_a
+    return usage_summary if usages.empty?
+
+    tokens = RubyLLM::Tokens.aggregate(usages.map(&:tokens))
+    cost = RubyLLM::Cost.aggregate(usages.map(&:cost), complete: usages.all?(&:cost_available?))
+
+    update_columns(
+      llm_attempts: usages.size,
+      input_tokens: tokens.input,
+      output_tokens: tokens.output,
+      cache_read_tokens: tokens.cache_read,
+      cache_write_tokens: tokens.cache_write,
+      thinking_tokens: tokens.thinking,
+      total_cost: cost.total,
+      usage_metadata: {
+        "providers" => usages.map(&:provider).uniq,
+        "models" => usages.map(&:model).uniq,
+        "statuses" => usages.group_by(&:status).transform_values(&:size)
+      },
+      updated_at: Time.current
+    )
+
+    usage_summary
+  end
+
+  def usage_summary
+    {
+      "attempts" => llm_attempts,
+      "input_tokens" => input_tokens,
+      "output_tokens" => output_tokens,
+      "cache_read_tokens" => cache_read_tokens,
+      "cache_write_tokens" => cache_write_tokens,
+      "thinking_tokens" => thinking_tokens,
+      "total_cost" => total_cost&.to_s,
+      "providers" => usage_metadata.fetch("providers", []),
+      "models" => usage_metadata.fetch("models", [])
+    }.compact
   end
 
   def stopping?

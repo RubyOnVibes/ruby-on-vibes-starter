@@ -16,6 +16,12 @@ RSpec.describe Member, type: :model do
       expect(member.user).to eq(users(:alice))
       expect(member.workspace).to eq(workspaces(:alice_personal))
     end
+
+    it 'nullifies the optional run initiator when a member is removed' do
+      association = described_class.reflect_on_association(:initiated_chat_runs)
+
+      expect(association.options[:dependent]).to eq(:nullify)
+    end
   end
 
   describe '#workspace_owner?' do

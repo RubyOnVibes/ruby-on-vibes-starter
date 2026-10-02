@@ -490,6 +490,127 @@ function ThinkingIndicator() {
   )
 }
 
+function ToolApprovalCard({ toolCall }) {
+  const [status, setStatus] = useState(toolCall.approval || 'pending')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setStatus(toolCall.approval || 'pending')
+  }, [toolCall.approval])
+
+  const decide = async (decision) => {
+    if (!toolCall.chatRunId || submitting || status !== 'pending') return
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const token = document.querySelector('meta[name="csrf-token"]')?.content || ''
+      const response = await fetch(
+        `/chat_runs/${toolCall.chatRunId}/tool_approvals/${encodeURIComponent(toolCall.id)}/${decision}`,
+        {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': token,
+            'Accept': 'application/json'
+          }
+        }
+      )
+
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.error || `Could not ${decision} tool call`)
+
+      setStatus(decision === 'approve' ? 'approved' : 'denied')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const decided = status === 'approved' || status === 'denied'
+
+  return (
+    <div
+      className="not-prose my-3 rounded-lg border p-3 text-sm"
+      style={{ backgroundColor: 'var(--vibes-surface-1)', borderColor: 'var(--color-border)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold" style={{ color: 'var(--color-foreground)' }}>
+            Approval required: {toolCall.name}
+          </div>
+          <div className="mt-1 text-xs" style={{ color: 'var(--color-muted-foreground)' }}>
+            Review the exact arguments before allowing this action.
+          </div>
+        </div>
+        {decided && (
+          <span
+            className="rounded-full px-2 py-1 text-xs font-medium"
+            style={{
+              backgroundColor: status === 'approved' ? 'color-mix(in srgb, #16a34a 15%, transparent)' : 'color-mix(in srgb, #dc2626 15%, transparent)',
+              color: status === 'approved' ? '#16a34a' : '#dc2626'
+            }}
+          >
+            {status === 'approved' ? 'Approved' : 'Denied'}
+          </span>
+        )}
+      </div>
+
+      <pre
+        className="mt-3 max-h-48 overflow-auto rounded p-2 text-xs whitespace-pre-wrap"
+        style={{ backgroundColor: 'var(--vibes-surface-2)', color: 'var(--color-foreground)' }}
+      >
+        {JSON.stringify(toolCall.arguments || {}, null, 2)}
+      </pre>
+
+      {!decided && (
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => decide('approve')}
+            className="rounded px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            style={{ backgroundColor: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => decide('deny')}
+            className="rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-foreground)' }}
+          >
+            Deny
+          </button>
+        </div>
+      )}
+
+      {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
+    </div>
+  )
+}
+
+function RunUsage({ usage }) {
+  if (!usage || !usage.attempts) return null
+
+  const cost = usage.total_cost == null ? null : Number(usage.total_cost)
+  const tokenParts = []
+  if (usage.input_tokens != null) tokenParts.push(`${usage.input_tokens.toLocaleString()} in`)
+  if (usage.output_tokens != null) tokenParts.push(`${usage.output_tokens.toLocaleString()} out`)
+  if (usage.cache_read_tokens) tokenParts.push(`${usage.cache_read_tokens.toLocaleString()} cached`)
+
+  return (
+    <span className="text-[10px]" style={{ color: 'var(--color-muted-foreground)' }}>
+      {usage.attempts} {usage.attempts === 1 ? 'request' : 'requests'}
+      {tokenParts.length > 0 ? ` · ${tokenParts.join(' / ')}` : ''}
+      {Number.isFinite(cost) ? ` · $${cost.toFixed(6)}` : ''}
+    </span>
+  )
+}
+
 export function MessageBubble({
   message,
   currentUserId,
@@ -544,8 +665,10 @@ export function MessageBubble({
     : <DefaultContentRenderer message={message} />
 
   const hasContent = message.content?.trim().length > 0
+  const approvalToolCalls = (message.tool_calls || []).filter((toolCall) => toolCall.requiresApproval)
+  const hasApprovalCards = approvalToolCalls.length > 0
 
-  if (!hasContent) return null
+  if (!hasContent && !hasApprovalCards) return null
 
   if (isSystemEvent) {
     return (
@@ -682,8 +805,12 @@ export function MessageBubble({
           )}
 
           <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-            {contentNode}
+            {hasContent && contentNode}
           </div>
+
+          {approvalToolCalls.map((toolCall) => (
+            <ToolApprovalCard key={toolCall.id} toolCall={toolCall} />
+          ))}
 
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-3 flex flex-col gap-2">
@@ -694,7 +821,7 @@ export function MessageBubble({
           )}
 
           <div className="flex items-center gap-2">
-            <button
+            {hasContent && <button
               type="button"
               onClick={handleCopy}
               className="inline-flex items-center gap-1 text-xs cursor-pointer"
@@ -720,7 +847,9 @@ export function MessageBubble({
                   <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
-            </button>
+            </button>}
+
+            <RunUsage usage={message.metadata?.run_usage} />
 
             {showTimestamp && message.createdAt && (
               <span className="text-[10px]" style={{ color: 'var(--color-muted-foreground)' }}>

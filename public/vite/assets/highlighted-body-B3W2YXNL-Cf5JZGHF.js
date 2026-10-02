@@ -1,2 +1,0 @@
-import{c as e,d as t,m as n}from"./dist-qZCv-DiS.js";import{i as r,r as i,t as a}from"./islands-Ct8dd8rs.js";var o=n(t(),1),s=e(),c=({code:e,language:t,raw:n,className:c,...l})=>{let{shikiTheme:u}=(0,o.useContext)(r),d=a(),[f,p]=(0,o.useState)(n);return(0,o.useEffect)(()=>{if(!d){p(n);return}let r=d.highlight({code:e,language:t,themes:u},e=>{p(e)});r&&p(r)},[e,t,u,d,n]),(0,s.jsx)(i,{className:c,language:t,result:f,...l})};export{c as HighlightedCodeBlockBody};
-//# sourceMappingURL=highlighted-body-B3W2YXNL-Cf5JZGHF.js.map

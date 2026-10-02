@@ -46,6 +46,8 @@ cp .env.example .env
 
 - **Fiber-based chat**: `ChatStreamJob` runs as an in-process fiber via `async-job`. LLM streaming, tool calls, and HTTP requests all yield during I/O — no thread starvation, no blocked workers.
 - **Background agent tasks**: Long-running work runs in SolidQueue as a separate process. Progress tracking, retries, cancellation, and audit trails built in.
+- **Human-approved actions**: Consequential RubyLLM tools pause durably for an authorized approve/deny decision before execution.
+- **Run accounting**: Every provider attempt, token bucket, cache hit, and defensible cost is attributed to its ChatRun.
 - **Multi-tenant**: Workspaces, members, roles, and permissions from day one.
 - **Any LLM provider**: Anthropic, OpenAI, Google, local models via Ollama — set an env var and go.
 
@@ -84,6 +86,7 @@ Guide to the built-in multitenancy system.
 - `docs/contexts.md` — Record context system for @mentions
 - `docs/mentionable.md` — Mentionable module for chat references
 - `docs/notifications.md` — Notification system
+- `docs/llm_release_exercises.md` — live-model release checklist for tools, approvals, tasks, accounting, caching, and compaction
 - `docs/queue.md` — SolidQueue configuration
 - `docs/cache.md` — SolidCache configuration
 - `docs/ssr.md` — Server-side rendering with Inertia

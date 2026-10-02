@@ -28,7 +28,7 @@ class AgentScheduledRunJob < SolidQueueJob
     end
 
     # Create a trigger message in the agent's chat
-    chat.messages.create!(
+    trigger_message = chat.messages.create!(
       role: :user,
       content: "Scheduled run: #{Time.current.strftime('%b %d, %Y %l:%M%P').strip}",
       user_submitted: false
@@ -44,11 +44,11 @@ class AgentScheduledRunJob < SolidQueueJob
     )
 
     # Create a ChatRun and trigger the chat stream (same path as user messages)
-    chat_run = chat.chat_runs.create!(status: :pending)
+    chat_run = chat.chat_runs.create!(status: :pending, initiated_by_member: member)
 
     ChatStreamJob.perform_later(
       chat.id,
-      nil,  # no user message (continuation-style)
+      trigger_message.id,
       chat_run.id,
       { sender_member_id: member.id, sender_user_id: member.user_id }
     )
