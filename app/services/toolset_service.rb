@@ -1,25 +1,7 @@
-##
-# ToolsetService - Registry of all tools available to the AI agent in chat.
-#
-# Tools are the capabilities the LLM can invoke during a conversation.
-# There are two kinds of tools:
-#
-#   1. INLINE tools — run inside the chat fiber, return results immediately.
-#      Good for fast lookups, simple operations (< ~10 seconds).
-#      Example: CurrentDateTimeTool, WebFetchTool
-#
-#   2. TASK-TRIGGERING tools — create an AgentTask and enqueue a background job.
-#      Good for long-running work, retries, progress tracking.
-#      Example: Examples::EchoAgentTaskTool → creates AgentTask → enqueues Examples::EchoAgentTaskJob
-#      (See app/tools/examples/ and app/jobs/examples/ for paired reference tools + jobs.)
-#
-# To add a new tool:
-#   1. Create your tool class in app/tools/ (subclass RubyLLM::Tool)
-#   2. Add it to .default_tool_classes or .additional_tool_classes below
-#   3. If it triggers a background task, also create a job in app/jobs/ (subclass AgentTaskJob)
-#
-# See docs/building_with_agents.md for the full guide.
-#
+# frozen_string_literal: true
+
+# Allowlisted application tools for the default assistant. Feature purposes can
+# declare tools directly using the native Agent DSL.
 class ToolsetService
   def initialize(user_message: nil, chat: nil, sender_user:, sender_member:, sender_workspace:)
     @user_message = user_message
@@ -65,7 +47,7 @@ class ToolsetService
   end
 
   # Add application-wide tools here. Feature gates also constrain the registry
-  # so a persisted Agent cannot bypass disabled reference/task capabilities.
+  # so a persisted Agent cannot bypass disabled reference capabilities.
   def self.default_tool_classes
     tools = [
       CurrentDateTimeTool,      # Returns current date/time in user's timezone
@@ -73,29 +55,6 @@ class ToolsetService
       WebFetchTool,             # Fetches and extracts text from web pages
     ]
 
-    # Agent task tools — gated behind agent_tasks being enabled
-    if RubyOnVibes.agent_tasks?
-      tools.push(
-        AgentTaskStatusTool,    # Check status/result of an agent task
-        CancelAgentTaskTool,    # Cancel a running agent task
-        ListAgentTasksTool      # List agent tasks in the chat
-      )
-
-      # Reference/demo tools for verifying the agent task pipeline end-to-end.
-      # Live in app/tools/examples/ and app/jobs/examples/ — copy them as starting
-      # points for your own tools. Available in dev/test by default; set
-      # VIBES_DEBUG_TOOLS=true to enable in production.
-      if RubyOnVibes.debug_tools?
-        tools.push(
-          Examples::EchoAgentTaskTool,         # Creates a task with progress updates
-          Examples::FailingAgentTaskTool,      # Creates a task that fails to test retries
-          Examples::SideEffectsExerciseTool    # Exercises all effect-tracking helpers end-to-end
-        )
-      end
-    end
-
-    # Keep the approval example independent from background-agent features so
-    # applications can adopt human-in-the-loop tools without enabling tasks.
     tools << Examples::RenameChatTool if RubyOnVibes.debug_tools?
 
     tools

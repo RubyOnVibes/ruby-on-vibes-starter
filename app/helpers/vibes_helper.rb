@@ -143,8 +143,6 @@ module VibesHelper
     # Chat - if LLM/chat is enabled
     items << { key: "chat", label: "Chat", path: "/chats", startsWithPath: "/chats" } if chat_enabled?
 
-    # Agent Tasks - defaults to chat enabled, but independently overridable
-    items << { key: "agent_tasks", label: "Agent Tasks", path: "/agent_tasks", startsWithPath: "/agent_tasks" } if agent_tasks_enabled?
 
     # Workspaces - if teams are enabled
     items << { key: "workspaces", label: "Workspaces", path: "/workspaces", startsWithPath: "/workspaces" } if teams_enabled?
@@ -183,12 +181,6 @@ module VibesHelper
 
   def payments_enabled?
     RubyOnVibes.config.stripe? && !hotwire_native_app_safe?
-  rescue
-    false
-  end
-
-  def agent_tasks_enabled?
-    RubyOnVibes.agent_tasks?
   rescue
     false
   end

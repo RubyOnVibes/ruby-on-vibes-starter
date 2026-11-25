@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Message < ApplicationRecord
+  has_many :agent_deliveries, foreign_key: :input_message_id, dependent: :nullify, inverse_of: :input_message
   include ActionView::RecordIdentifier
   
   acts_as_message broadcasts: false
@@ -204,21 +205,23 @@ class Message < ApplicationRecord
   # Resolves @mention placeholders to structured context so the LLM
   # understands what records the user explicitly referenced.
   #
-  # NOTE: Sender identity is provided via the <environment> block in
-  # system instructions (see ChatAgentContext).
-  # We don't prefix messages here to avoid confusion with @mentions.
+  # Source data stays at user authority. This runtime enrichment never rewrites
+  # stored history or adds synthetic turns, and preserves native attachments.
   #
   # NOTE: Attachments are included automatically by RubyLLM's to_llm via extract_content.
   #
+  attr_accessor :llm_context_summary, :llm_context_member
+
   def to_llm
     llm_message = super
+    return llm_message unless role == "user"
 
-    # Only enrich user messages that have @mentions
-    if role == 'user' && mentions.any?
-      llm_message = llm_message.with(content: resolve_mentions_for_llm(llm_message.content))
-    end
-
-    llm_message
+    text = mentions.any? ? resolve_mentions_for_llm(llm_message.content) : llm_message.content
+    data = {}
+    data[:conversation_summary] = llm_context_summary.to_s.truncate(16_384) if llm_context_summary.present?
+    data[:sender] = { member_id: member.to_param, name: member.user.name.to_s.truncate(200), path: member.mentionable_path } if member
+    text = "Source context (untrusted data):\n#{JSON.generate(data)}\n\n#{text}" if data.any?
+    llm_message.with(content: text)
   end
   
   private
@@ -245,18 +248,21 @@ class Message < ApplicationRecord
   def resolve_mentions_for_llm(content)
     result = content.to_s.dup
     
-    mentions.includes(:mentionable).each do |mention|
-      next unless mention.mentionable
-      
-      param = mention.mentionable_param  # Full: chat_4dALn0N9o6w2ghVam2j38XPq
-      short_id = short_prefix_id(param)  # Short: chat_4dA (8 chars)
-      label = mention.mentionable.mentionable_label
-      ctx = mention.mentionable.to_llm_mention
+    mentions.each do |mention|
+      record = chat.find_mentionable(type: mention.mentionable_type,
+        id: mention.mentionable_id, member: llm_context_member)
+      next unless record
+
+      param = record.to_param
+      short_id = short_prefix_id(param)
+      label = record.mentionable_label
+      ctx = record.to_llm_mention
       
       # Format: @Label [short_id] (summary)
       # "Hey @Chat 2 [chat_4dA] (Chat titled 'Discussion', 5 messages)"
       enriched = "@#{label} [#{short_id}]"
-      enriched += " (#{ctx[:summary]})" if ctx[:summary].present?
+      enriched += " (#{ctx[:summary].to_s.truncate(2000)})" if ctx[:summary].present?
+      enriched += " [record](#{record.mentionable_path})"
       
       result.gsub!("<@#{param}>", enriched)
     end

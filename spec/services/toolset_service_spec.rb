@@ -48,8 +48,7 @@ RSpec.describe ToolsetService do
       .to raise_error(ToolsetService::InvalidToolConfiguration)
   end
 
-  it "offers the approval reference tool without enabling background tasks" do
-    allow(RubyOnVibes).to receive(:agent_tasks?).and_return(false)
+  it "offers the approval reference tool when explicitly enabled" do
     allow(RubyOnVibes).to receive(:debug_tools?).and_return(true)
 
     service = described_class.new(
@@ -63,7 +62,6 @@ RSpec.describe ToolsetService do
   end
 
   it "does not expose reference tools when debug tools are disabled" do
-    allow(RubyOnVibes).to receive(:agent_tasks?).and_return(false)
     allow(RubyOnVibes).to receive(:debug_tools?).and_return(false)
 
     service = described_class.new(

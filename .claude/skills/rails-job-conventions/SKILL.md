@@ -5,14 +5,39 @@ description: Use when creating or modifying Rails jobs in app/jobs
 
 # Rails job conventions
 
-Durable application and agent work uses Solid Queue through ApplicationJob. Run `bin/jobs` alongside the web process. Falcon handles HTTP/WebSockets; Solid Cable carries worker broadcasts across processes. Do not pin agent execution or Turbo broadcast jobs to an in-process async adapter.
+Use plain `ApplicationJob` subclasses with Solid Queue. Run `bin/jobs` alongside
+the web process. Falcon serves HTTP/WebSockets and Solid Cable carries worker
+broadcasts. Do not bind durable work to an in-process async adapter.
 
-Pass record IDs. Persist dispatch intent before enqueueing; missing deliveries and expired native claims are recovered by ResumeChatRunsJob. ChatStreamJob accepts a ChatRun ID and rebuilds its purpose and original actor from saved records. Native RubyLLM owns conversation claims, tool/task state and message persistence. Never delete or hide tool results to repair interruption or cancellation.
+Pass record IDs and persist intent before enqueueing. `ChatStreamJob.perform`
+accepts one `ChatRun` ID. The run stores its original actor and input; each job
+rebuilds the named purpose and rechecks current access. `ResumeChatRunsJob`
+recovers missing delivery, expired native claims and due native task polls.
+A duplicate delivery must leave a live native claim's owner alone.
 
-Use native RubyLLM::Task for resumable tool work, Tool#resume for idempotent progress checks, and native questions/approvals for human decisions. Waiting cannot depend on an open browser. Do not hold a database transaction across provider or external network calls.
+RubyLLM owns claims, tool calls, task/question state and message persistence.
+Do not introduce another orchestration base job, continuation-depth loop or
+synthetic user message. Native `RubyLLM::Task` pauses a tool call; `Tool#resume`
+reads the linked business operation without repeating `execute`.
 
-Delivery may repeat. A terminal-state check alone is not a concurrency guard. Protect business effects with unique operation keys, transactions and external API idempotency where supported. Distinguish a tracking/progress record from the operation that performs the effect. Explicitly define retryable errors and their bounds.
+Ordinary jobs perform the business work. Models own its progress, cancellation,
+evidence and operation-level idempotency. Wire native task cancellation to the
+application job's policy explicitly. Never hold a database transaction across a
+provider or external network request. Protect short local effects with unique
+business keys and transactions; external effects may require provider keys and
+reconciliation after ambiguous failure.
 
-Keep jobs small; authorization and business rules belong in models/services. Recheck the initiating actor's current access on resume. Do not substitute the approver or the current browser user for the saved actor.
+Use Rails retry facilities for explicitly retryable errors with bounds. A
+terminal-state check alone is not a concurrency guard. A new call or run may
+propose the same business operation, so tool-call identity alone is insufficient.
+Keep user-visible errors generic and diagnostics free of sensitive payloads.
 
-See docs/agent-foundations.md and docs/shared_broadcasts.md for the application contracts and validation commands.
+Schedules and webhooks use the `AgentDelivery` inbox. Persist receipt identity
+and payload before enqueueing, deduplicate atomically, and leave busy-chat events
+pending for later delivery. Once admitted, its linked `ChatRun` owns execution.
+Receipts are delivery bookkeeping, not a second conversation lifecycle.
+
+Read `docs/agent-foundations.md`, `docs/native-task-recipe.md`, and
+`docs/webhooks.md` for the tested integration paths. Recheck the initiating actor
+inside the actual effect; neither a later approver nor the worker's ambient
+request context may replace that actor.

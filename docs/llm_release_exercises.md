@@ -86,57 +86,71 @@ Pass:
 - Both timezone calls precede the random choice.
 - One final response explains the result.
 
-## Agent tasks — run when agent-task code changes
+## Native deferred tools — run when task execution changes
 
-### 8. One task and automatic continuation
+Use the opt-in [native task recipe](native-task-recipe.md) and its prepared report
+fixture for this group. Register its named purpose in the test application; the
+example is not enabled in ordinary assistant chats. Run `bin/jobs` separately
+from the web process. No legacy task runner or browser scheduler is involved.
 
-> Run the echo task with the message “hello from Puerto Rico” and a duration of 2 seconds.
+### 8. Approval, background work, and resume
 
-Pass:
-
-- The first turn queues the task without polling.
-- The ChatRun enters `awaiting_tasks`.
-- Completion triggers one automatic continuation.
-- The final response summarizes the result and the run becomes `completed`.
-
-### 9. Parallel tasks
-
-> Run two echo tasks for 2 seconds: one saying “task A” and one saying “task B”.
+Ask the report-publication agent to publish a prepared report, then approve it.
 
 Pass:
 
-- Exactly two tasks are created.
-- Continuation waits until both are terminal and fires only once.
+- No publication occurs before the authorized approval.
+- The approved tool returns a native task and the ChatRun enters `awaiting_tasks`.
+- A normal Rails job performs the business operation.
+- The same tool call resumes with the saved operation result; `execute` does not
+  run again and no synthetic user message is created.
+- The final assistant response completes the original run.
 
-### 10. Cancellation
+### 9. Restart and duplicate delivery
 
-Start a 10-second echo task, then press Stop while it is running.
-
-Pass:
-
-- ChatRun and active task become `cancelled`.
-- The composer unlocks immediately.
-- No later continuation or duplicate result appears.
-
-### 11. Parent task, subtask, and effects
-
-> Run the side-effects exercise with one subtask.
+Stop and restart the worker while the native task is parked, then deliver the
+same job more than once.
 
 Pass:
 
-- Parent and child tasks complete.
-- The task detail shows all expected effect types without duplicates.
-- One continuation summarizes only this run's tasks.
+- The original actor and input survive.
+- One business publication exists, and the tool returns its stable result.
+- A delayed duplicate cannot mark a live execution failed or complete it early.
 
-### 12. Failed background task
+### 10. Cancellation and revoked access
 
-> Run the failing task.
+Pause work before publication, then cancel the run or revoke the initiating
+member's access before allowing the job to continue.
 
 Pass:
 
-- Retries follow the configured policy.
-- The task ends `failed` with a useful error.
-- The chat remains usable and the continuation reports failure without polling.
+- The operation does not publish after cancellation or authorization revocation.
+- The task's cancellation hook applies the application's cancellation policy;
+  native task state alone is not proof that an arbitrary background job stopped.
+- Another participant's approval never substitutes that participant as actor.
+
+### 11. Repeat the same business command
+
+Request the same publication again through a new tool call or a new run.
+
+Pass:
+
+- The workspace's business publication key identifies the same operation.
+- Exactly one publication effect exists, including concurrent deliveries.
+- Changing the approved input requires a new reviewed operation; it cannot
+  silently change the evidence associated with the earlier approval.
+
+### 12. Lost job delivery
+
+Use a controlled fixture to fail enqueueing or lose the business job delivery
+while the publication remains queued.
+
+Pass:
+
+- The durable operation remains queued without a partial effect.
+- Native task polling can request delivery again after the queue recovers.
+- Duplicate recovered deliveries still produce one publication.
+- Recovery needs neither a new user turn nor an open browser.
 
 ## Human-approved tools — run every release
 
@@ -210,7 +224,7 @@ Pass:
 - Both turns succeed normally.
 - The later ChatRun reports positive `cache_read_tokens` when the provider
   actually returns a cache hit.
-- Per-turn mentions, participant context, and task results remain current; they
+- Per-turn source records and native tool results remain current; they
   must not be reused from the cached prefix.
 
 Unset the flag after the exercise.
@@ -261,7 +275,7 @@ For any failure, preserve:
 - ChatRun id and status history.
 - Message ids/roles around the failure.
 - Tool-call id, approval value, and result relationship.
-- AgentTask ids and effects.
+- Native tool task data and the linked business operation/effect identity.
 - RubyLLM usage rows for the run.
 - Provider/model and server logs.
 

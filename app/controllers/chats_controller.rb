@@ -79,7 +79,7 @@ class ChatsController < ApplicationController
     authorize @chat, :update?
 
     @chat.transaction do
-      @chat.update!(agent_tasks_dismissed_at: Time.current, compaction_summary: nil, last_compacted_at: nil)
+      @chat.update!(compaction_summary: nil, last_compacted_at: nil)
 
       # Destroy messages so RubyLLM usage/tool-call records and application
       # attachments/mentions are cleaned up through their associations.

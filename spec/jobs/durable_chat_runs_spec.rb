@@ -14,6 +14,7 @@ RSpec.describe "Durable chat execution", type: :job do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_append_to)
     allow(ChatStreamJob).to receive(:perform_later)
+    allow(ChatStreamJob).to receive(:set).and_return(ChatStreamJob)
   end
 
   def new_run
@@ -81,18 +82,28 @@ RSpec.describe "Durable chat execution", type: :job do
     expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
   end
 
-  it "does not let a legacy payload replace the stored actor or chat" do
-    run = new_run
-    expect { ChatStreamJob.perform_now(chats(:team_chat).id, nil, run.id) }.to raise_error(ArgumentError)
-    expect(run.reload.initiated_by_member).to eq(member)
-  end
-
   it "fails closed after membership revocation before any provider work" do
     run = new_run
     chat.chat_members.where(member: member).delete_all
     expect_any_instance_of(Chat).not_to receive(:complete)
     expect { ChatStreamJob.perform_now(run.id) }.to raise_error(Pundit::NotAuthorizedError)
     expect(run.reload).to be_status_failed
+  end
+
+  it "recovers other runs even when a waiting task's actor lost access" do
+    revoked_run = new_run
+    revoked_run.update!(status: :awaiting_tasks)
+    chat.chat_members.where(member: member).delete_all
+    other_chat = chats(:team_chat)
+    other_run = other_chat.chat_runs.create!(initiated_by_member: other_chat.member)
+
+    ResumeChatRunsJob.perform_now
+
+    expect(ChatStreamJob).to have_received(:perform_later).with(revoked_run.id)
+    expect(ChatStreamJob).to have_received(:perform_later).with(other_run.id)
+    expect_any_instance_of(Chat).not_to receive(:complete)
+    expect { ChatStreamJob.perform_now(revoked_run.id) }.to raise_error(Pundit::NotAuthorizedError)
+    expect(revoked_run.reload).to be_status_failed
   end
 
   it "does not resurrect a run cancelled during setup" do

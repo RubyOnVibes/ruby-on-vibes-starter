@@ -24,14 +24,13 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
       role: :user, content: content, user_submitted: !automated,
       member: automated ? nil : member, user: automated ? nil : member.user
     )
-    run = chat.chat_runs.create!(initiated_by_member: member, status: :pending)
-    ChatStreamJob.perform_now(chat.id, message.id, run.id)
+    run = chat.chat_runs.create!(initiated_by_member: member, input_message: message, status: :pending)
+    ChatStreamJob.perform_now(run.id)
     run.reload
   end
 
   def resume_run(run)
-    ChatStreamJob.perform_now(chat.id, nil, run.id,
-      sender_member_id: member.id, sender_user_id: member.user_id, approval_resume: true)
+    ChatStreamJob.perform_now(run.id)
     run.reload
   end
 
@@ -174,7 +173,7 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
     expect_any_instance_of(Chat).not_to receive(:complete)
     expect(ChatStreamJob).not_to receive(:set)
 
-    ChatStreamJob.perform_now(chat.id, nil, run.id)
+    ChatStreamJob.perform_now(run.id)
 
     expect(run.reload).to be_status_running
     expect(chat.reload.claim_token).to eq("another-process")
@@ -186,62 +185,47 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
     run.decide_tool_call!(run.pending_questions.sole.id, decision: "approved", member: member)
     chat.reload.update!(claim_token: "crashed-process", claimed_until: 1.minute.ago)
 
-    ChatStreamJob.perform_now(chat.id, nil, run.id,
-      sender_member_id: member.id, sender_user_id: member.user_id)
+    ChatStreamJob.perform_now(run.id)
 
     expect(run.reload).to be_status_completed
     expect(chat.reload.name).to eq("Recovered title")
     expect(chat.messages.where(role: :tool).count).to eq(1)
   end
 
-  it "requeues a quick follow-up until the previous run releases its native claim" do
-    chat.chat_runs.create!(initiated_by_member: member, status: :failed)
+  it "recovers a pending delivery after a previous claim expires without a retry chain" do
     chat.update!(claim_token: "previous-run", claimed_until: 1.minute.from_now)
     message = chat.messages.create!(role: :user, content: "One more thing", member: member, user: member.user)
-    run = chat.chat_runs.create!(initiated_by_member: member, status: :pending)
-    adapter = ActiveJob::QueueAdapters::TestAdapter.new
-    allow(ChatStreamJob).to receive(:queue_adapter).and_return(adapter)
+    run = chat.chat_runs.create!(initiated_by_member: member, input_message: message)
+    allow(ChatStreamJob).to receive(:perform_later)
     stub_replies "Here is the follow-up."
-
-    ChatStreamJob.perform_now(chat.id, message.id, run.id)
-
+    160.times { ChatStreamJob.perform_now(run.id) }
     expect(run.reload).to be_status_pending
+    expect(ChatStreamJob).not_to have_received(:perform_later)
     expect(chat.messages.where(role: :assistant)).to be_empty
-    queued_job = adapter.enqueued_jobs.sole
-    expect(queued_job[:at]).to be > Time.current.to_f
-    chat.update!(claim_token: nil, claimed_until: nil)
-    ActiveJob::Base.execute(queued_job)
-
+    chat.update!(claimed_until: 1.minute.ago)
+    ResumeChatRunsJob.perform_now
+    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
+    ChatStreamJob.perform_now(run.id)
     expect(run.reload).to be_status_completed
     expect(run.llm_attempts).to eq(1)
-    expect(chat.messages.where(role: :assistant).sole.content).to eq("Here is the follow-up.")
   end
 
-  it "fails visibly if the previous claim stays busy beyond the bounded retry window" do
-    chat.update!(claim_token: "previous-run", claimed_until: 1.minute.from_now)
-    run = chat.chat_runs.create!(initiated_by_member: member, status: :pending)
+  it "never fails an active owner after repeated duplicate deliveries" do
+    run = chat.chat_runs.create!(initiated_by_member: member, status: :running)
+    chat.update!(claim_token: "same-run-owner", claimed_until: 30.minutes.from_now)
+    expect_any_instance_of(Chat).not_to receive(:complete)
     expect(ChatStreamJob).not_to receive(:set)
-    expect_any_instance_of(Chat).not_to receive(:complete)
-
-    ChatStreamJob.perform_now(chat.id, nil, run.id, claim_retries: ChatStreamJob::CLAIM_RETRY_LIMIT)
-
-    expect(run.reload).to be_status_failed
-    expect(chat.messages.where(role: :assistant).sole.content).to include("previous response is still running")
+    160.times { ChatStreamJob.perform_now(run.id) }
+    expect(run.reload).to be_status_running
+    expect(chat.reload.claim_token).to eq("same-run-owner")
+    expect(chat.messages.where(role: :assistant)).to be_empty
   end
 
-  it "does not process a queued follow-up cancelled before the claim becomes free" do
-    chat.update!(claim_token: "previous-run", claimed_until: 1.minute.from_now)
-    run = chat.chat_runs.create!(initiated_by_member: member, status: :pending)
-    adapter = ActiveJob::QueueAdapters::TestAdapter.new
-    allow(ChatStreamJob).to receive(:queue_adapter).and_return(adapter)
+  it "does not recover cancelled work after a claim expires" do
+    run = chat.chat_runs.create!(initiated_by_member: member, status: :cancelled)
+    chat.update!(claim_token: "previous-run", claimed_until: 1.minute.ago)
     expect_any_instance_of(Chat).not_to receive(:complete)
-    ChatStreamJob.perform_now(chat.id, nil, run.id)
-
-    run.update!(status: :cancelled)
-    chat.update!(claim_token: nil, claimed_until: nil)
-    ActiveJob::Base.execute(adapter.enqueued_jobs.sole)
-
+    ChatStreamJob.perform_now(run.id)
     expect(run.reload).to be_status_cancelled
-    expect(chat.messages.where(role: :assistant)).to be_empty
   end
 end

@@ -10,11 +10,17 @@
 #     schedule: at 5am every day
 
 development:
+  resume_agent_deliveries:
+    class: ResumeAgentDeliveriesJob
+    schedule: every minute
   resume_chat_runs:
     class: ResumeChatRunsJob
     schedule: every minute
 
 production:
+  resume_agent_deliveries:
+    class: ResumeAgentDeliveriesJob
+    schedule: every minute
   resume_chat_runs:
     class: ResumeChatRunsJob
     schedule: every minute
@@ -29,7 +35,8 @@ production:
   # == Persistent Agent Scheduled Runs ==
   #
   # To schedule an agent, uncomment and set the agent ID.
-  # Inactive agents and missing IDs are skipped. Use a business idempotency key
+  # Inactive agents and missing IDs are skipped. Busy chats retain the event
+  # in AgentDelivery until the prior run finishes. Use a business idempotency key
   # in tools that perform external effects; recurring delivery may repeat.
   #
   # Find agent IDs: Agent.where(schedule: not_nil).pluck(:id, :identifier, :schedule)

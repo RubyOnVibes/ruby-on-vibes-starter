@@ -1,47 +1,99 @@
 # Agent foundations
 
-The standalone starter is the primary application. It needs a Rails web process, `bin/jobs`, a database, Active Storage and configured provider credentials. No platform account or deployment CLI is required. Shared source is kept aligned with `ruby-on-vibes/spec/templates/0_1_0`; deployment integration is a separate validation task.
+The standalone starter needs a Rails web process, `bin/jobs`, a database, Active
+Storage and configured provider credentials. Shared source is mirrored into
+`ruby-on-vibes/spec/templates/0_1_0`; platform deployment is a separate concern.
 
-## Ownership
+## One execution path
 
-RubyLLM owns the conversation loop, claims and heartbeats, tool calls, native questions, resumable tasks, message persistence and file store. Rails owns authentication, workspace authorization, business records and durable delivery. `ChatRun` records the original actor, input message, dispatch intent, status and usage; it is not a second tool engine.
+RubyLLM owns the conversation loop, claims and heartbeats, tool calls, persisted
+questions, native deferred tasks, messages and file store. Rails owns identity,
+workspace authorization, business records and durable queue delivery. `ChatRun`
+records the original actor, input message, dispatch intent, status and usage.
 
-Persist a run with its input message, then call `run.dispatch!`. `ChatStreamJob` accepts the run ID, rebuilds trusted configuration, rechecks the initiating member's access and calls native `complete`. The original actor continues to execute after another participant approves. HTTP submission rejects active runs and live native claims before writing a new message.
+Persist a run with its input, then call `run.dispatch!`. `ChatStreamJob.perform`
+accepts only the run ID. Each delivery rebuilds the named purpose, rechecks the
+original actor's access and invokes native `complete`. Another participant's
+approval does not change the acting identity. An active run or live native claim
+prevents a new HTTP message from starting another turn in that conversation.
 
-`ResumeChatRunsJob` runs every minute in development and production. It redelivers missing dispatches, expired claims and due task polls. A working native `RubyLLM::Task` persists its data on the tool call; a later job invokes `Tool#resume`, without repeating `execute` or adding another user message. `input_required` tasks stay parked until an application callback calls `run.resume_tasks!(explicit: true)`. Native questions use the authenticated answer/approval routes. Legacy `AgentTask` progress work is supported and resumes on the server when terminal; the browser is not an execution scheduler.
+`ResumeChatRunsJob` redelivers missing dispatches, expired claims and due native
+task polls. A live claim belongs to its worker; a stale duplicate delivery must
+not fail or complete that worker's run. A persisted question waits for an
+authorized answer. An `input_required` task waits until an application callback
+calls `run.resume_tasks!(explicit: true)`.
 
-Delivery is at least once. Native claims serialize the model/tool loop. A tool interrupted after starting may have partly completed; RubyLLM preserves that evidence instead of blindly replaying it. Tools that charge money, submit records or call external systems need business idempotency keys and unique indexes, plus reconciliation where necessary. `AgentTask` is a business progress record, not a universal exactly-once primitive.
+## Deferred work
 
-Cancellation requests native cancellation and preserves all messages and tool results. Partial streaming text is transient; RubyLLM persists final messages with its claim fencing. Solid Cable carries worker updates to the web process; see [shared broadcasts](shared_broadcasts.md).
+The tool protocol is `execute → RubyLLM::Task → resume → result`. Native task
+data persists on its tool call. Resume reads the operation's progress and result;
+it does not repeat `execute` or create a synthetic user message.
 
-## Named purposes
+A native task is not a queue or a business-operation model. Ordinary Active Job
+jobs perform background work; domain records hold progress, cancellation state
+and evidence. The [native task recipe](native-task-recipe.md) demonstrates an
+approved report publication with a unique business key and immutable input.
+Application cancellation must be connected to the domain job explicitly.
 
-`chats.purpose` defaults to `assistant`. `ChatPurpose.registry` maps stable application names to trusted `ApplicationAgent` subclasses. Add names in code, never accept arbitrary class names from requests. Each job binds the authorized persisted Chat and supplies `run_context`; the agent declares tools, instructions, schema and file behavior through native RubyLLM APIs. Purposes cannot change while work is pending.
+There is no application task runner alongside this protocol. The retired
+prototype task models, jobs, polling UI and continuation logic have been removed.
+Schedules and webhooks use `AgentDelivery` receipts to admit a trigger once and
+wait durably while a chat is busy; see [trigger delivery](webhooks.md).
 
-`ChatAgent` implements the general assistant. `ChatAgentContext` contains its application-specific mentions, participant context, task progress and links. Feature agents can define a much smaller toolset without inheriting the general assistant's tools. The optional database `Agent` model describes a configurable worker identity; it is separate from a RubyLLM agent class. Its `tool_config` is a subset of the code-owned ToolsetService allowlist: nil uses defaults and an empty array grants no application tools.
+Delivery is at least once. Native claims serialize conversation execution, but a
+tool interrupted after starting may already have affected another system.
+RubyLLM preserves that evidence rather than blindly replaying the tool. Protect
+business effects with operation-level unique keys and transactions; external
+services may need provider idempotency and reconciliation. A tool-call ID alone
+cannot deduplicate the same business request proposed in a later run.
 
-Runtime instructions are rebuilt on every turn/resume without rewriting message history. Tool rounds/calls are bounded. Prompt caching and fallback models remain explicit environment opt-ins.
+## Purposes and trust
 
-## Files and artifacts
+`ChatPurpose.registry` maps application-owned names to `ApplicationAgent`
+subclasses. The default is `assistant`. Register names in code, never resolve
+request-supplied class names. Bind only a scoped chat and its initiating member.
+Tools, schema, file behavior and instructions are native agent declarations;
+adding a new feature does not require editing the central execution job.
 
-See [chat files](chat-files.md). Upload/list/download access is authorized through chat membership. Native files are shared with the chat, while usage belongs to the ChatRun; do not set `chat.with_owner(run)` to implement usage accounting. That would partition file visibility by turn.
+The default assistant uses a small instruction policy and trusted configured
+agent instructions. Mentioned records and compaction summaries enter user-role
+content through `Message#to_llm`; tool results remain tool content. Neither source
+material nor a model response can authorize a resource or effect. Role separation
+reduces instruction confusion but does not by itself prevent prompt injection.
+Recheck authorization in every business tool and asynchronous effect.
 
-Uploads and published artifacts receive unique paths. The native file store is mutable. Versioned paths prevent accidental replacement, but applications needing immutable approved documents must retain digest/blob references and enforce immutability in their domain records.
+The optional database `Agent` stores workspace worker identity and configuration;
+it is distinct from a native agent class. `ToolsetService` allowlists its selected
+tools: nil uses assistant defaults, and an empty array grants no application
+tools. A feature purpose can declare a smaller toolset directly.
 
-## Design review
+## Decisions, files and usage
 
-Claude Code and a separate Codex reviewer inspected the installed RubyLLM 2.2.3 APIs and application independently. Both recommended a small Rails delivery shell around native execution. Adopted findings: remove destructive recovery/cancellation, preserve original actor, keep shared file ownership distinct from usage ownership, use native tasks and claims, and repair browser-only continuation and tracking tasks that waited on themselves.
+Native approval/question endpoints authorize decisions and record the decider.
+The default permits requester confirmation or a chat-owner decision. Products
+requiring a distinct approver must enforce that business policy explicitly.
+Cancellation calls native cancellation and retains completed messages/results.
+Solid Cable carries worker updates; partial streaming text remains transient.
 
-We did not add a generic file audit table: a starter cannot infer every product's retention and evidence policy, and a metadata log alone would not preserve overwritten content. The document-intake example on its separate branch owns its business identity and accepted output. Likewise, application AgentTask remains optional rather than becoming a parallel workflow framework.
+File access is authorized through chat membership. The native file store belongs
+to the shared chat; usage belongs to `ChatRun` through `RubyLLM.with_owner(run)`.
+Changing `chat.with_owner` to attribute usage would also change file visibility.
+See [chat files](chat-files.md) and [shared broadcasts](shared_broadcasts.md).
+
+File-store contents are mutable. Unique paths reduce accidental replacement;
+immutable approved evidence belongs in application records with digest/blob
+references. Tool round/call limits apply per completion, not as lifetime spending
+budgets. Prompt caching and fallback models remain explicit environment opt-ins.
 
 ## Validation
 
-Run `bundle exec rspec`, `bin/rails zeitwerk:check`, and `bundle exec ruby script/check_shared_broadcasts.rb`. Tests use the real RubyLLM loop with fixture provider responses for durable pauses, approvals, cancellation and usage. The shared-broadcast probe boots two processes and a disposable database. Provider credentials are unnecessary for these checks. Real provider quality, PostgreSQL multi-host concurrency and platform deployment remain separate integration checks.
+Run `bundle exec rspec`, `bin/rails zeitwerk:check`,
+`bundle exec ruby script/check_durable_execution.rb`, and
+`bundle exec ruby script/check_shared_broadcasts.rb`.
 
-The standalone cross-process probe `bundle exec ruby script/check_durable_execution.rb`
-verifies task persistence/resumption, abrupt worker exit and native claim expiry,
-preserved prior tool results, non-replay of interrupted calls, and overlapping
-same-run deliveries. It uses a temporary SQLite database and blocked HTTP with
-scripted provider responses; it explicitly delivers jobs rather than testing
-queue supervision. The separate document-intake demo validates the actual worker
-and browser path.
+Specs use native RubyLLM execution with scripted provider responses to exercise
+authorization, parked decisions, native tasks, delivery races and usage. The
+process probes cover worker interruption, claim expiry, preserved results and
+shared broadcasts using disposable SQLite databases. These establish execution
+behavior, not model quality or production PostgreSQL concurrency. Live evaluation
+and deployment qualification remain explicit, separate checks.

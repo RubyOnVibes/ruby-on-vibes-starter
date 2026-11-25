@@ -6,6 +6,7 @@
     id: chat_run.id,
     status: chat_run.status,
     isActive: chat_run.active?,
+    pending_tasks: chat_run.status_awaiting_tasks? ? chat_run.chat.pending_tasks.map { |task| { id: task.tool_call&.id, status: task.status, message: task.status_message.to_s.truncate(500) } } : [],
     createdAt: chat_run.created_at&.iso8601
   }.to_json %>'
   style="display: none;"

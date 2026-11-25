@@ -8,7 +8,7 @@
 # what's important to preserve.
 #
 # The summary is stored on the chat record (not as a message) and injected into
-# the system prompt by ChatStreamJob. Original messages are preserved in DB
+# user-role source context by Chat#eager_load_messages. Original messages are preserved in DB
 # marked `compacted: true` for audit trail and UI display.
 #
 # Concurrency: Uses `compacting_since` datetime column as a lock. Atomic

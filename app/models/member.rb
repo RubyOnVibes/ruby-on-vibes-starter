@@ -1,4 +1,5 @@
 class Member < ApplicationRecord
+  has_many :example_report_publications, class_name: "Examples::ReportPublication", inverse_of: :member, dependent: :destroy
   has_prefix_id :mbr
 
   include Mentionable
@@ -17,6 +18,12 @@ class Member < ApplicationRecord
     dependent: :nullify,
     inverse_of: :initiated_by_member
   
+  has_many :initiated_agent_deliveries,
+    class_name: "AgentDelivery",
+    foreign_key: :initiated_by_member_id,
+    dependent: :nullify,
+    inverse_of: :initiated_by_member
+
   # Chat invitations
   has_many :sent_chat_invitations, class_name: 'ChatInvitation', foreign_key: 'inviter_id', dependent: :destroy
   has_many :received_chat_invitations, class_name: 'ChatInvitation', foreign_key: 'invitee_id', dependent: :destroy

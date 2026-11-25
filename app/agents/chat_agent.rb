@@ -5,10 +5,8 @@
 class ChatAgent < ApplicationAgent
   tools { run_context.tools }
 
-  # Keep the reusable prefix ahead of mentions, participants and task results.
-  # with_caching(false) suppresses explicit boundaries unless opted in.
+  # Cache only application policy; record data stays in user/tool messages.
   instructions(cache_until_here: true) { run_context.stable_instructions }
-  instructions(append: true, persist: false) { run_context.dynamic_instructions }
   caching { ENV["LLM_PROMPT_CACHING"] == "true" ? {} : false }
 
   # Files belong to the shared conversation. Usage remains owned by ChatRun;

@@ -1,187 +1,148 @@
-## What This Is
-
-This is not a minimal Rails starter. It is a normal Rails app with AI-product plumbing already in place:
-
-```text
-Rails app
-├─ users / auth / workspaces
-├─ chat streaming
-├─ LLM tools
-├─ background agent tasks
-├─ webhooks + scheduled agents
-├─ queues / notifications / billing hooks
-└─ optional Ruby on Vibes platform deploy path
-```
-
 # Ruby on Vibes Starter
 
-An opinionated, AI-enhanced Rails 8 template for building agentic web applications. Chat with an AI assistant that can look things up, run background tasks autonomously, track its work, and report back — all on production-ready infrastructure.
+An opinionated Rails starter for applications with agents working on business
+records. It combines workspaces, authentication, chat, human decisions, files
+and durable background execution using native Rails and RubyLLM capabilities.
 
-Built on Ruby 4.0.10, Rails 8.1.4.1, RubyLLM 2.2.3, Falcon, Solid Queue, and Solid Cable, with ERB/Turbo, React islands, and Inertia pages.
-
-## Community
-
-- **Website:** [rubyonvibes.com](https://rubyonvibes.com)
-- **Discord:** [Join the community](https://discord.gg/DrfUKhtFmD)
+Built on Ruby **4.0.10**, Rails **8.1.4.1**, RubyLLM **2.2.3**, Falcon, Solid Queue
+and Solid Cable, with ERB/Turbo, React islands and Inertia pages.
 
 ## Quickstart
 
-```bash
+```sh
 git clone <your-fork-url>
 cd <your-app>
 cp .env.example .env
-# Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env before starting the app.
-bin/setup --skip-server  # bundle, db:prepare, JS deps
-bin/dev                 # Falcon + Solid Queue + Vite + Tailwind
+# Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env.
+bin/setup --skip-server
+bin/dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. `bin/dev` starts the web process, durable workers and
+asset watchers. Provider credentials enable local chat without a platform
+account. Keep hosted-platform variables unset for normal local development.
 
-The provider key enables local chat without a platform account or mounted
-runtime. Use ENV variables (a local uncommitted `.env`, or the hosted Secrets
-menu), not Rails credentials. `LLMS_ENABLED=true` only exposes the feature; it
-does not supply provider credentials. Keep hosted platform variables unset for
-normal local development.
+Set `LLM_MODEL` to override the default model and configure that provider's key.
+Use an uncommitted `.env` or deployment environment variables for credentials.
+`LLMS_ENABLED=true` only exposes the feature; it does not supply credentials.
+`LLMS_ENABLED=false` disables the default chat gate; `AGENTS_ENABLED=true`
+separately enables persistent automation. These visibility settings do not block
+direct RubyLLM calls from application code. Restart after changing them.
 
-Set `LLM_MODEL` to override the default model and configure the key for its
-provider. `LLMS_ENABLED=false` disables the default chat and task feature gates,
-even with keys configured. `AGENTS_ENABLED=true` is a separate development
-override that still exposes persistent agents.
-These flags do not block direct RubyLLM calls from application code. Settings
-take effect when the application restarts.
+## What the starter supplies
 
-## Architecture
+- **Durable conversations:** `ChatRun` stores the initiating actor and dispatch
+  intent. Solid Queue delivers work; RubyLLM owns claims, persisted messages,
+  questions and deferred tool tasks. Solid Cable carries worker updates.
+- **Named purposes:** application-owned names select trusted native agent classes
+  with purpose-specific tools, instructions and schemas.
+- **Human decisions:** authenticated approval and question UI, with original actor
+  authorization checked again when execution resumes.
+- **Files and artifacts:** native file stores backed by Active Storage, with
+  chat-scoped upload/list/download authorization.
+- **Trigger delivery:** scheduled slots and webhook receipts are deduplicated and
+  wait durably for the conversation to become available.
+- **Usage ownership:** calls inside the chat job belong to its run. Other services
+  establish their own owner through `RubyLLM.with_owner`.
+- **Application basics:** users, workspaces, roles, notifications and optional
+  billing, administration and analytics.
 
-- **Durable chat**: Solid Queue runs conversations outside the web process. Native RubyLLM claims and tasks preserve interrupted work, and Solid Cable streams worker updates to the browser.
-- **Named purposes**: Trusted `ApplicationAgent` classes define tools and instructions for each chat purpose.
-- **Files and artifacts**: Native RubyLLM file stores use Active Storage, with authenticated chat-scoped uploads and downloads.
-- **Background agent tasks**: Long-running work runs in SolidQueue as a separate process. Progress tracking, retries, cancellation, and audit trails built in.
-- **Human decisions**: RubyLLM tools can pause for approval or a question. The chat UI supports approvals, typed form fields, and URL requests with workspace authorization.
-- **Run accounting**: Calls inside the chat job are attributed to its ChatRun. Other services establish usage ownership explicitly with `RubyLLM.with_owner`.
-- **Multi-tenant**: Workspaces, members, roles, and permissions from day one.
-- **Direct provider access**: Anthropic and OpenAI keys work without the hosted platform. Other RubyLLM providers need explicit configuration and application checks.
+Slow tools use **one native task protocol**. Ordinary Rails jobs perform the
+work; domain records hold business progress and evidence. The old application
+task runner and its polling UI have been removed. See the opt-in
+[native task recipe](docs/native-task-recipe.md) for an approval-gated report
+publication with a unique business key, immutable input and worker resumption.
 
-## Using RubyLLM
+Delivery is at least once. Native execution does not make external business
+side effects exactly once. Tools still need authorization, business idempotency
+and reconciliation appropriate to the operation. Stored file contents are
+mutable unless the application preserves immutable approved evidence.
 
-Start with [Agent foundations](docs/agent-foundations.md) for durable execution, purposes, and files, then [Building with Agents](docs/building_with_agents.md) for a structured
-output example, the native `ApplicationAgent` base, tools, background tasks,
-provider-free integration tests, and an opt-in evaluation with deterministic
-checks. Additional capabilities such as MCP, skills, and sandboxed
-code execution are available to configure; they are not all enabled in the
-starter's chat UI by installing the gem.
+## Start building
 
-The template already includes Schematist through RubyLLM. Add optional companion
-tools only for a concrete feature: `mxc` for sandboxed execution, the `skill` CLI
-for installing skills, or an OpenTelemetry SDK/exporter for a tracing backend.
-Do not install a second MCP or evaluation framework for features already in core.
+1. Read [agent foundations](docs/agent-foundations.md) for execution ownership and
+   its limits.
+2. Add an `ApplicationAgent` and register a [named purpose](docs/chat_purposes.md).
+   Declare tools on that purpose; no central job edits are needed.
+3. Follow [building with agents](docs/building_with_agents.md) for schemas, tools,
+   decisions, provider-free tests and explicit quality evaluations.
+4. Use [chat files](docs/chat-files.md) and [trigger delivery](docs/webhooks.md)
+   when the feature requires uploads or automation.
 
-See [RubyLLM upgrades and platform compatibility](docs/rubyllm-upgrade.md) before
-updating an existing database or the separate Ruby on Vibes platform. The
-platform's dependency lock and embedded template do not change automatically.
+RubyLLM already includes MCP, skills, evaluations and instrumentation. Configure
+those capabilities deliberately when needed; do not add a parallel framework
+for native functionality. Anthropic and OpenAI keys are configured by default.
+Other providers require explicit configuration and integration checks.
 
-## Documentation
+## Validation
 
-All guides live in `docs/`. Start here:
-
-### Building with Agents
-
-How to add AI-powered capabilities using tools and agent tasks.
-
-**Location:** `docs/building_with_agents.md`
-
-**Covers:**
-
-- Native RubyLLM agents, structured output, test helpers, and evaluations
-- Tools vs Agent Tasks — when to use each
-- Creating inline tools (short operations inside the durable chat job)
-- Creating agent tasks (background, long-running, with retries and progress)
-- Effect tracking for audit trails
-- Decision guide and file conventions
-
-### Workspaces & Members
-
-Guide to the built-in multitenancy system.
-
-**Location:** `docs/workspaces.md`
-
-**Covers:**
-
-- Workspace and Member models
-- Personal vs Team workspaces
-- Roles, permissions, invitations
-- Scoping data to workspaces
-- Billing integration
-
-### Additional Docs
-
-- `docs/contexts.md` — Record context system for @mentions
-- `docs/mentionable.md` — Mentionable module for chat references
-- `docs/notifications.md` — Notification system
-- `docs/llm_release_exercises.md` — live-model release checklist for tools, approvals, tasks, accounting, caching, and compaction
-- `docs/rubyllm-upgrade.md` — starter migrations, platform upgrade stages, and a canonical local template source
-- `docs/queue.md` — SolidQueue configuration
-- `docs/cache.md` — SolidCache configuration
-- `docs/ssr.md` — Server-side rendering with Inertia
-- `docs/javascript.md` — JavaScript/React architecture
-- `docs/Tailwind.md` — TailwindCSS v4 setup
-- `docs/pagination.md` — Pagy pagination
-- `docs/prefixed_ids.md` — Prefix ID system
-- `docs/email.md` — Email configuration
-- `docs/deployment/` — SQLite and PostgreSQL deployment guides
-- `docs/vibes-api.md` — Hosted-platform sync surface (off by default; see security note)
-
-## Key Directories
-
-```
-app/tools/           — AI tool classes (RubyLLM::Tool subclasses)
-app/agents/          — Native RubyLLM agent classes (ApplicationAgent subclasses)
-app/jobs/            — Background jobs (AgentTaskJob subclasses for tasks)
-app/models/          — Models including AgentTask, AgentTaskEffect
-app/services/        — ToolsetService (tool registration), business logic
-app/controllers/api/ — JSON API endpoints (task polling, chat)
-app/javascript/      — React components (Inertia islands)
-docs/                — All documentation
+```sh
+bundle exec rspec
+bin/rails zeitwerk:check
+bundle exec ruby script/check_durable_execution.rb
+bundle exec ruby script/check_shared_broadcasts.rb
 ```
 
-## Deployment
+The default tests use scripted providers and exercise the real conversation
+loop. Process probes use disposable SQLite databases. Live model quality,
+production PostgreSQL concurrency and deployment compatibility require separate
+checks. [Release exercises](docs/llm_release_exercises.md) describe opt-in live
+checks; they are not part of the default test run.
 
-The template ships with multiple deploy paths so you can pick one:
+## Application guides
 
-- `Dockerfile` — production container, used by all platforms below.
-- `fly.toml` — Fly.io. Set `app = "<your-app>"` and update `[build] image = "..."` to point at your own registry tag before `flyctl deploy`. (The hosted Ruby on Vibes platform auto-rewrites both fields during its image build pipeline; if you're forking the template to deploy yourself, you own them.)
-- `render.sqlite.yaml` / `render.postgres.yaml` — Render Blueprint configs. Replace `REPLACE_ME` placeholders with your service name. See `docs/deployment/`.
-- `.kamal/` — Kamal config (Docker-based VPS deploys).
+- [Workspaces and members](docs/workspaces.md)
+- [Record context](docs/contexts.md) and [mentions](docs/mentionable.md)
+- [Notifications](docs/notifications.md)
+- [Shared broadcasts](docs/shared_broadcasts.md), [queues](docs/queue.md) and [cache](docs/cache.md)
+- [JavaScript](docs/javascript.md), [Tailwind](docs/Tailwind.md) and [SSR](docs/ssr.md)
+- [Deployment guides](docs/deployment/)
+- [RubyLLM migration history](docs/rubyllm-upgrade.md)
 
-## Optional Modules
+```text
+app/agents/       Native agent declarations and named application behavior
+app/tools/        RubyLLM tools with application authorization
+app/jobs/         Ordinary Rails jobs and durable conversation delivery
+app/models/       Application records, ChatRun, AgentDelivery and domain operations
+app/services/     Default assistant tool selection and application services
+app/javascript/   Shared React components and UI adapters
+```
 
-Several gems and features are optional and can be removed or disabled:
+## Optional modules and deployment
 
-- **Billing (Stripe + Pay + Receipts)** — disable in `config/vibes.yml` (`payment_processors: []`).
-- **Admin panel (Madmin)** — remove the gem if you'll build your own admin UI.
-- **Analytics (Blazer + Ahoy)** — remove if you don't need internal dashboards.
-- **Mailbin** — auto-mounts at `/mailbin` in development; production opts in only when no real mailer is configured.
-- **MCP introspection (Tidewave)** — only activates when `TIDEWAVE_ENABLED=true` and a shared secret is set.
+Billing, Madmin administration, Blazer/Ahoy analytics, Mailbin and development
+MCP introspection can be disabled or removed when unnecessary. Billing is
+configured in `config/vibes.yml`. Tidewave requires `TIDEWAVE_ENABLED=true` and a
+shared secret. Mailbin is enabled in development; production requires explicit
+configuration when no real mailer is present.
 
-## Security Note: Vibes API
+The repository includes a production Dockerfile, Render Blueprint examples,
+Kamal configuration and a Fly configuration. Configure an application's own
+environment and target account before deployment; these files are starting
+points, not proof of a validated deployment.
 
-`app/controllers/vibes/api/` exposes endpoints used by the hosted Ruby on Vibes platform to sync code into running app instances. **They are off by default.** They only mount when `VIBES_API_ENABLED=true`, and authentication fails closed if `VIBES_API_TOKEN` is unset. If you self-host, leave both unset unless you're sure you need them. See `docs/vibes-api.md`.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+The optional hosted-platform code-sync endpoints are off by default. They mount
+only with `VIBES_API_ENABLED=true` and require `VIBES_API_TOKEN`. Leave both unset
+for ordinary standalone use. See [Vibes API](docs/vibes-api.md).
 
 ## Maintaining the starter
 
-`main` is the official reusable starter. Feature and demo branches remain separate
-until their shared changes are reviewed and merged. The document-intake demo is
-on `codex/document-intake-demo`, not part of the default application.
+`main` is the official starter. Product demos stay on separate branches; the
+document-intake demo is on `codex/document-intake-demo`.
 
-For maintainers who also have the Ruby on Vibes platform checkout, the starter
-is the source for `spec/templates/0_1_0/`. From that checkout, use
-`script/sync-from-public-template --check` to check parity and
-`script/sync-from-public-template --apply` to copy a committed, clean starter
-`main`. Syncing source does not deploy or validate the platform runtime.
+The standalone repository is canonical for the platform's embedded
+`spec/templates/0_1_0/`. In the platform checkout,
+`script/sync-from-public-template` previews differences, `--apply` copies a clean
+committed starter `main`, and `--check` verifies parity after review and commit.
+The sync command never commits, pushes or deploys. Source parity does not certify
+platform runtime compatibility.
 
-## Upgrades
+The starter targets new applications. Its fresh schema includes native RubyLLM
+task persistence and application delivery records; the prototype task storage
+and APIs are absent.
 
-For Rails upgrade guidance: https://github.com/ombulabs/claude-code_rails-upgrade-skill
+## Community and license
+
+[Website](https://rubyonvibes.com) · [Discord](https://discord.gg/DrfUKhtFmD)
+
+MIT — see [LICENSE](LICENSE).

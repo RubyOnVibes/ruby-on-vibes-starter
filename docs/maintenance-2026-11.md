@@ -1,5 +1,7 @@
 # Template maintenance review — November 25, 2026
 
+> Historical review of the pre-consolidation starter. Capability gaps and proposed work below describe that earlier snapshot; use [agent foundations](agent-foundations.md) and [building with agents](building_with_agents.md) for the current native-only design.
+
 ## Decision and scope
 
 The objective is a secure, reproducible Rails foundation that composes native

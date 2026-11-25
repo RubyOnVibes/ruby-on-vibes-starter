@@ -34,10 +34,6 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  def require_agent_tasks_enabled!
-    redirect_to root_path unless RubyOnVibes.agent_tasks?
-  end
-
   def require_chat_enabled!
     redirect_to root_path unless RubyOnVibes.chat?
   end

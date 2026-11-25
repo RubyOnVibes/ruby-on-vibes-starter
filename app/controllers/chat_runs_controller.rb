@@ -16,8 +16,8 @@ class ChatRunsController < ApplicationController
   end
 
   # POST /chat_runs/:id/continue
-  # Triggered by frontend when all agent tasks have completed during awaiting_tasks state.
-  # Resumes the chat run so the assistant can summarize task results.
+  # Explicit user signal for a native input-required task. The tool must still
+  # verify its external/domain completion state in resume.
   def continue
     authorize @chat_run.chat, :send_messages?
 
@@ -80,7 +80,7 @@ class ChatRunsController < ApplicationController
       pending_approvals: @chat_run.pending_tool_approvals.size,
       pending_questions: @chat_run.pending_questions.size
     }, status: :ok
-  rescue ChatRun::ToolCallAlreadyDecided, RubyLLM::ToolCallRunningError
+  rescue RubyLLM::ToolCallRunningError
     render json: { error: "Tool call has already been decided" }, status: :conflict
   rescue ArgumentError => e
     render json: { error: e.message }, status: :unprocessable_content

@@ -1,5 +1,7 @@
 # RubyLLM upgrades and platform compatibility
 
+> Historical dependency upgrade notes and a separate platform plan. The current starter targets fresh applications; this document is not an upgrade contract for older generated apps. See [agent foundations](agent-foundations.md) for the current execution design and the README for template synchronization.
+
 This guide applies to the standalone starter and its shared embedded template.
 Both copies are aligned by the [November maintenance update](maintenance-2026-11.md).
 The platform application itself has not been upgraded or deployment-tested here.

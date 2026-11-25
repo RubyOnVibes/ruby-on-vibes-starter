@@ -71,8 +71,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Agent tasks - workspace-level index + show
-  resources :agent_tasks, only: [:index, :show]
   
   namespace :api do
     namespace :v1 do
@@ -93,16 +91,6 @@ Rails.application.routes.draw do
         end
       end
       
-      # Agent task polling and management
-      resources :agent_tasks, only: [:index, :show] do
-        collection do
-          post :dismiss
-        end
-        member do
-          post :cancel
-        end
-      end
-
       # Webhook endpoint for persistent agents (unauthenticated — token is the auth)
       post "hooks/:token", to: "webhooks#receive", as: :webhook_receive
 

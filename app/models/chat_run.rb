@@ -1,33 +1,14 @@
 # frozen_string_literal: true
 
-##
-# ChatRun - Tracks a single chat job execution
-#
-# Enables graceful cancellation of streaming responses.
-# Each chat can have only ONE active run at a time.
-#
-# MULTI-NODE SAFE:
-# - Tracks node_name to identify which server is running the job
-# - Relies on polling (ChatStreamJob checks stopping?) for cancellation
-#
-# Status flow:
-#   pending → running → (completed | cancelled | failed)
-#                     → awaiting_tasks → running (continuation)
-#                     → awaiting_approval → running (approved/denied)
-#
-# ARCHITECTURE NOTE:
-# - ChatRun tracks JOB EXECUTION (when, status, which node)
-# - Message tracks CONTENT (what the LLM said)
-# - Related via time window + chat_id, not direct FK
-# - This separation allows one run to involve multiple messages (tool use, retries)
-#
+# Application intent, actor and usage for one native conversation execution.
+# Native RubyLLM messages, claims, questions and tasks remain authoritative.
 class ChatRun < ApplicationRecord
-  class ToolCallAlreadyDecided < StandardError; end
-
   belongs_to :chat
   belongs_to :input_message, class_name: "Message", inverse_of: :triggered_chat_runs, optional: true
   validate :input_message_belongs_to_chat
   belongs_to :initiated_by_member, class_name: "Member", optional: true
+  has_one :agent_delivery, dependent: :nullify, inverse_of: :chat_run
+  has_many :example_report_publications, class_name: "Examples::ReportPublication", inverse_of: :chat_run, dependent: :nullify
   has_many :owned_llm_usages, class_name: "RubyLLM::ActiveRecord::Usage", as: :owner, dependent: :nullify
 
   enum :status, {
@@ -58,17 +39,22 @@ class ChatRun < ApplicationRecord
 
   # The persisted intent is the outbox. If enqueueing or a worker dies, the
   # recurring recovery job can redeliver it without reconstructing a browser request.
-  def dispatch!(wait: 0, options: {})
+  def dispatch!(wait: 0)
     with_lock do
       return false unless active?
-      update!(execution_options: execution_options.merge(options.stringify_keys), resume_at: Time.current + wait)
+      update!(resume_at: Time.current + wait)
     end
-    if wait.positive?
-      ChatStreamJob.set(wait_until: resume_at).perform_later(id)
-    else
-      ChatStreamJob.perform_later(id)
+    begin
+      job = if wait.positive?
+        ChatStreamJob.set(wait_until: resume_at).perform_later(id)
+      else
+        ChatStreamJob.perform_later(id)
+      end
+      job != false
+    rescue StandardError => error
+      Rails.logger.error("[ChatRun] Enqueue failed for #{id}: #{error.class}")
+      false
     end
-    true
   end
 
   def execution_member!
@@ -77,30 +63,16 @@ class ChatRun < ApplicationRecord
     actor
   end
 
-  def business_tasks
-    chat.agent_tasks.where("created_at >= ?", created_at).where.not(kind: %w[scheduled_run webhook_run])
-  end
-
-  # Native tasks retain their own resumable state. Legacy application tasks
-  # still receive one synthetic turn, persisted before dispatch so retries do
-  # not add another. Neither path needs a browser to remain open.
+  # Only native tasks may park the tool loop. An input-required task needs an
+  # authorized application callback; polling must never silently answer it.
   def resume_tasks!(explicit: false)
     with_lock do
       return false unless status_awaiting_tasks?
+      return false if chat.running?
       tasks = chat.pending_tasks
-      if tasks.any?
-        return false if !explicit && tasks.all?(&:input_required?)
-      else
-        return false if business_tasks.active.exists?
-        depth = execution_options.fetch("continuation_depth", 0).to_i + 1
-        if depth > ENV.fetch("MAX_CONTINUATION_DEPTH", 5).to_i
-          update!(status: :failed)
-          return false
-        end
-        self.input_message = chat.messages.create!(role: :user,
-          content: "My background tasks have finished. Please check their results.", user_submitted: false)
-        self.execution_options = execution_options.merge("task_continuation" => true, "continuation_depth" => depth)
-      end
+      return false if !explicit && tasks.any? && tasks.all?(&:input_required?)
+      # This only delivers intent; the worker reauthorizes before any provider
+      # or tool work, including when the original actor has since lost access.
       update!(status: :running, resume_at: Time.current)
     end
     dispatch!
@@ -146,8 +118,8 @@ class ChatRun < ApplicationRecord
       raise ActiveRecord::RecordNotFound if approval_only && !question.approval?
       tool_call = approval_tool_calls.find { |candidate| candidate.tool_call_id == question.tool_call.id }
 
-      requester_id = tool_call.metadata["requester_member_id"]&.to_i
-      unless member && (requester_id == member.id || chat.owner?(member))
+      execution_member!
+      unless can_decide?(member: member, tool_call: tool_call)
         raise Pundit::NotAuthorizedError, "not allowed to decide this tool call"
       end
 
@@ -165,7 +137,7 @@ class ChatRun < ApplicationRecord
       )
 
       if pending_questions.empty?
-        update!(status: :running, resume_at: Time.current, execution_options: execution_options.merge("approval_resume" => true))
+        update!(status: :running, resume_at: Time.current)
         should_resume = true
       end
     end
@@ -189,29 +161,29 @@ class ChatRun < ApplicationRecord
     end
   end
 
-  # Use RubyLLM's persisted questions, scoped to this run. Retain the ability to
-  # decide approvals parked by 2.0, which had no native "pending" marker.
+  # Use RubyLLM's persisted questions, scoped to this run.
   def pending_questions
     calls = approval_tool_calls
     call_ids = calls.map(&:tool_call_id)
     questions = chat.pending_questions.select { |question| call_ids.include?(question.tool_call.id) }
+    # HTTP reads have no agent toolset bound. Reconstruct the native question
+    # from the approval metadata written when the authorized worker parked.
     pending_tool_approvals.each do |call|
       next if call.result_id.present? || questions.any? { |question| question.id == call.tool_call_id }
-
       questions << RubyLLM::Question.approval(call.to_llm, chat: chat)
     end
     questions
   end
 
-  # Native ownership is authoritative, including compaction and continuation
-  # attempts. Use the time window only for legacy usages without an owner: a
-  # superseded run can still be releasing its claim when the next run starts.
+  # Customize this application policy for tools requiring a separate reviewer.
+  # A confirmation defaults to the recorded requester or the chat owner.
+  def can_decide?(member:, tool_call:)
+    member && chat.member_exists?(member) &&
+      (tool_call.metadata["requester_member_id"].to_i == member.id || chat.owner?(member))
+  end
+
   def capture_usage!
-    records = RubyLLM::ActiveRecord::Usage
-    usages = records.where(id: owned_llm_usages.select(:id))
-      .or(records.where(id: chat.ruby_llm_usages.where(owner_type: nil, owner_id: nil)
-        .where(created_at: created_at..(active? ? Time.current : ended_at)).select(:id)))
-      .chronological.to_a
+    usages = owned_llm_usages.chronological.to_a
     return usage_summary if usages.empty?
 
     tokens = RubyLLM::Tokens.aggregate(usages.map(&:tokens))
@@ -269,18 +241,18 @@ class ChatRun < ApplicationRecord
   def cancel!(cancelled_by: nil)
     return true if status_completed? || status_cancelled?
 
-    transaction do
+    with_lock do
+      return true unless active?
       chat.cancel
-      update!(status: :cancelled, cancelled_by: cancelled_by)
-
-      # Cancel all active agent tasks for this chat.
-      # Whether we're mid-stream (running) or waiting (awaiting_tasks),
-      # stopping means "stop everything."
-      chat.agent_tasks.active.find_each(&:cancel!)
-
-      # RubyLLM closes unfinished calls and preserves completed effects. Keep
-      # messages and tool results as the durable record of what actually ran.
-
+      begin
+        # Settle parked calls before another submitted message can obscure
+        # their response. This only processes cancellation, never a provider
+        # request; if a worker owns the native claim, it observes the flag.
+        chat.run_tools
+      rescue RubyLLM::CancelledError
+        # Native cancellation has persisted the unfinished tool results.
+      end
+      update!(status: :cancelled, cancelled_by: cancelled_by, resume_at: nil)
     end
 
     true

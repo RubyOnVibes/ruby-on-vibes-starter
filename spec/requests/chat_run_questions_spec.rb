@@ -48,7 +48,6 @@ RSpec.describe "ChatRun questions", type: :request do
     expect(run.reload).to be_status_running
     expect(ChatStreamJob).to have_received(:perform_later).with(run.id).once
     expect(run.initiated_by_member).to eq(member)
-    expect(run.execution_options).to include("approval_resume" => true)
   end
 
   it "persists a decline note and resumes without an answer" do
@@ -255,7 +254,6 @@ RSpec.describe "ChatRun questions", type: :request do
       expect(call.reload.metadata.fetch("decided_by_member_id")).to eq(requester.id)
       expect(ChatStreamJob).to have_received(:perform_later).with(run.id).once
       expect(run.reload.initiated_by_member).to eq(member)
-      expect(run.execution_options).to include("approval_resume" => true)
     end
   end
 end

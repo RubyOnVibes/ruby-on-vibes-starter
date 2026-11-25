@@ -1,130 +1,86 @@
-# Webhooks
+# Agent event delivery
 
-Persistent agents can receive external events via webhooks. Any service that can send an HTTP POST (GitHub, Stripe, Linear, custom scripts) can trigger an agent run.
+Webhook and scheduled events use the same `AgentDelivery` inbox. The receipt
+stores the original agent, chat, actor, event data, and delivery identity before
+any queue operation. `AgentDeliveryJob` waits until the chat is available, then
+creates one trigger message and one `ChatRun` in the same transaction as the
+receipt link. RubyLLM executes the run through the ordinary chat job.
 
-## How it works
+`ResumeAgentDeliveriesJob` retries pending receipts every minute in development
+and production. Busy chats, missing queue deliveries, and an enqueue failure do
+not discard accepted events. A crash after creating a run is recovered by
+`ResumeChatRunsJob`. Neither recovery path requires an open browser.
 
-Each agent has a unique **webhook token** generated automatically on creation. The token is the auth — no API keys or sessions needed.
+A receipt marked `dispatched` means its run was created, not that its business
+operation succeeded. Read the linked `ChatRun` for execution state. Disabling the
+agent or removing the original actor's chat access before delivery marks the
+receipt `rejected`; later execution also rechecks actor permissions. Reassigning
+an agent does not replace the actor of an already accepted event.
 
-```
-POST /api/v1/hooks/:token
-```
+## Webhook requests
 
-When a webhook arrives:
-
-1. The payload is posted as a message in the agent's chat
-2. An `AgentTask` is created with `trigger: "webhook"`
-3. A `ChatStreamJob` fires so the agent can reason about the event
-4. The endpoint returns `202 Accepted` with the task ID immediately
-
-## Finding the webhook URL
+Each persistent agent has a secret webhook URL:
 
 ```ruby
-agent = Agent.find_by(identifier: "manager")
 agent.webhook_url
-# => "https://your-app.fly.dev/api/v1/hooks/a1b2c3d4..."
+# https://example.com/api/v1/hooks/SECRET_TOKEN
 ```
 
-Or from the agents admin UI (when available).
+The generic endpoint authenticates by that token. Keep the URL private and use
+`agent.regenerate_webhook_token!` to revoke it. Provider-specific signatures are
+not automatically verified: a service that requires HMAC signature verification
+needs its own adapter before calling `AgentDelivery.accept!`.
 
-## Testing with curl
-
-```bash
-curl -X POST https://your-app.fly.dev/api/v1/hooks/YOUR_TOKEN \
-  -H "Content-Type: application/json" \
-  -H "X-Event-Type: test" \
-  -d '{"message": "Hello from curl"}'
+```sh
+curl -X POST http://localhost:3000/api/v1/hooks/SECRET_TOKEN \
+  -H 'Content-Type: application/json' \
+  -H 'X-Event-Type: invoice.created' \
+  -H 'Idempotency-Key: source-delivery-123' \
+  -d '{"invoice_id":"invoice-42"}'
 ```
 
-Response:
-```json
-{"task_id": "agent_task_abc123"}
-```
+The response is `202 Accepted` with `{"delivery_id":"agent_delivery_…"}`.
+The receipt is committed before this response, even if enqueueing is temporarily
+unavailable. Identical retries with the same key return `200 OK` and the same
+receipt; they do not add another message or run. Reusing a key for a different
+payload or event type returns `409 Conflict`. Keys are scoped to the agent and
+trigger type. Without a key, each request is a separate event.
 
-The agent will see:
-> Webhook received: test
-> ```json
-> {"message": "Hello from curl"}
-> ```
+Headers:
 
-## GitHub example
+- `X-Event-Type`, falling back to `X-GitHub-Event`, supplies the event label.
+- `Idempotency-Key`, falling back to `X-GitHub-Delivery`, supplies delivery identity.
+- Each header is limited to 255 characters.
 
-1. Go to your GitHub repo → **Settings** → **Webhooks** → **Add webhook**
-2. Set **Payload URL** to your agent's `webhook_url`
-3. Set **Content type** to `application/json`
-4. Select events (e.g., "Push events", "Pull request events")
-5. Click **Add webhook**
+Bodies must be valid UTF-8 and no larger than 1 MiB. Oversized bodies are rejected
+with `413`; they are never silently truncated into an accepted receipt. The
+receipt retains the full body. The chat receives at most a 2,000-character
+preview as external user-message data. Applications needing the complete event
+should provide an authorized domain tool that reads the receipt or source record.
+Do not treat external payload text as instructions or authority for an action.
 
-The agent will receive a message each time the selected events fire. GitHub sends an `X-GitHub-Event` header that the endpoint uses automatically as the event label.
+The default route deliberately has no unauthenticated receipt lookup endpoint.
+Add an application-specific authenticated operator view if needed. Rate limits,
+provider signature adapters, retention, and redacted logs belong to the deployed
+application's integration policy.
 
-## Regenerating tokens
+## Scheduled events
 
-If a token is compromised:
+`AgentScheduledRunJob` accepts the event into the same inbox. Configure recurring
+jobs in `config/recurring.yml`; a stored `Agent.schedule` value alone does not
+install a schedule.
 
 ```ruby
-agent.regenerate_webhook_token!
+AgentScheduledRunJob.perform_later(agent.id, slot: "daily-close:2026-11-26")
 ```
 
-This invalidates the old URL immediately. Update the webhook URL in any external services.
+Use a stable occurrence key when a scheduler can deliver the same occurrence
+through different jobs. The same slot creates one receipt even after its run
+finishes. Without an explicit slot, the serialized Active Job's `job_id` is the
+key: redelivery of that job deduplicates, while two independently enqueued jobs
+are distinct occurrences. This avoids guessing an occurrence from wall-clock
+execution time. Events accepted while the chat is busy remain pending.
 
-## Event headers
-
-The endpoint looks for event type in these headers (in order):
-
-1. `X-Event-Type` (generic, use for custom integrations)
-2. `X-GitHub-Event` (GitHub-specific)
-3. Falls back to "external event" if neither is present
-
-## Payload handling
-
-- Message content: first 2,000 characters of the raw payload
-- Task metadata: full JSON (parsed) or first 5,000 characters (if not valid JSON)
-- Both JSON and plain text payloads are accepted
-
-## Adding signature verification
-
-The generic endpoint uses token-based auth (the URL itself is the secret). For additional security with a specific service, create a controller that verifies signatures before forwarding:
-
-```ruby
-# app/controllers/api/v1/github_webhooks_controller.rb
-module Api
-  module V1
-    class GithubWebhooksController < Api::V1::BaseController
-      skip_before_action :setup_current
-
-      def receive
-        verify_signature!
-
-        # Forward to the generic webhook handler
-        agent = Agent.find_by!(webhook_token: params[:token])
-        # ... same logic as WebhooksController#receive
-      end
-
-      private
-
-      def verify_signature!
-        signature = request.headers["X-Hub-Signature-256"]
-        payload = request.body.read
-        expected = "sha256=" + OpenSSL::HMAC.hexdigest("SHA256", ENV["GITHUB_WEBHOOK_SECRET"], payload)
-
-        unless ActiveSupport::SecurityUtils.secure_compare(signature.to_s, expected)
-          head :unauthorized
-        end
-
-        request.body.rewind
-      end
-    end
-  end
-end
-```
-
-## Rate limiting
-
-For production, consider adding rate limiting with `rack-attack`:
-
-```ruby
-# config/initializers/rack_attack.rb
-Rack::Attack.throttle("webhook/ip", limit: 60, period: 60) do |req|
-  req.ip if req.path.start_with?("/api/v1/hooks/")
-end
-```
+Delivery deduplication is not business-effect idempotency. A different event or
+model tool call can propose the same business action; use a unique business key,
+transactions and external-provider idempotency or reconciliation for that action.

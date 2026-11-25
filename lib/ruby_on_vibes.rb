@@ -170,25 +170,20 @@ module RubyOnVibes
     anthropic_key.present? || openai_key.present?
   end
   
-  # llm?, chat?, and agent_tasks? can be overridden independently of each other.
-  # e.g., disable chat but keep agent_tasks for cron-driven agents without chat UI.
+  # Chat visibility and persistent automation can be configured independently.
 
   def self.chat?
     llm?
-  end
-
-  def self.agent_tasks?
-    chat?
   end
 
   def self.agents?
     return true if ENV['AGENTS_ENABLED'] == 'true' # dev override for rapid template iteration
 
     agents_enabled = true # Persistent agents (Manager, webhooks, scheduled runs) — change to false for apps with no agent component.
-    agents_enabled && agent_tasks?
+    agents_enabled && chat?
   end
 
-  # Debug/demo tools (echo task, failing task) for verifying the agent task pipeline.
+  # Optional tools for local examples and verification.
   # Enabled in dev/test by default. Set VIBES_DEBUG_TOOLS=true in production to enable.
   def self.debug_tools?
     Rails.env.development? || Rails.env.test? || ENV["VIBES_DEBUG_TOOLS"] == "true"

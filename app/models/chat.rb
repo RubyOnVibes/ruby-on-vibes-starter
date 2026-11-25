@@ -1,8 +1,12 @@
 class Chat < ApplicationRecord
+  has_many :example_report_publications, class_name: "Examples::ReportPublication", inverse_of: :chat, dependent: :destroy
   has_prefix_id :chat
   include Mentionable
 
   acts_as_chat
+
+  # Runtime-only actor for record hydration. Set by ChatPurpose, never Current.
+  attr_accessor :llm_context_member
 
   validates :purpose, inclusion: { in: ->(_) { ChatPurpose.keys } }
   validate :purpose_is_fixed_during_work
@@ -22,38 +26,33 @@ class Chat < ApplicationRecord
       next true if msg.compacted?
       next false if msg.role.to_s == 'system'
       next false if msg.content.present?
+      next false if msg.role.to_s == 'user' && msg.attachments.attached?
       next false if msg.role.to_s == 'tool'
       next false if msg.role.to_s == 'assistant' && msg.ruby_llm_tool_calls.exists?
       true
     end
 
-    # Deduplicate consecutive user messages. These occur when RubyLLM's
-    # cleanup_failed_messages destroys the assistant placeholder on API error,
-    # leaving user messages with no response between them. The Anthropic API
-    # rejects consecutive same-role messages. Keep only the last in each run.
-    deduped = []
-    filtered.each do |msg|
-      if msg.role.to_s == 'user' && deduped.last&.role.to_s == 'user'
-        deduped[-1] = msg
-      else
-        deduped << msg
-      end
-    end
-
-    deduped
+    filtered
   end
 
   # RubyLLM 2.0 owns message ordering internally, so filter the fully-loaded
   # persisted history at the point where it is synchronized into the chat.
   def eager_load_messages
-    order_messages_for_llm(super)
+    records = order_messages_for_llm(super)
+    users = records.select { |message| message.role == "user" }
+    users.each do |message|
+      message.llm_context_summary = nil
+      message.llm_context_member = llm_context_member
+    end
+    users.first.llm_context_summary = compaction_summary if users.any?
+    records
   end
   private :eager_load_messages
 
   belongs_to :member  # Creator/owner (for audit trail and permissions)
   has_many :messages, dependent: :destroy  # Cascade delete all messages when chat deleted
   has_many :chat_runs, dependent: :destroy  # Track job executions for cancellation
-  has_many :agent_tasks, dependent: :destroy  # Background tasks triggered through chat
+  has_many :agent_deliveries, dependent: :destroy, inverse_of: :chat
   has_one :agent  # Optional: if this chat belongs to a persistent agent
 
   ##
@@ -102,6 +101,29 @@ class Chat < ApplicationRecord
     chat_members.exists?(member_id: m.id)
   end
   
+  # Shared mention policy for admission and later model hydration. Participation
+  # grants member/workspace context across a group chat, but another chat must
+  # still be accessible to the current actor. New types require explicit policy.
+  def mentionable_scope(type, member:)
+    return unless member && members.exists?(id: member.id)
+
+    case type.to_s
+    when "Member" then members
+    when "Workspace" then Workspace.where(id: members.select(:workspace_id))
+    when "Chat" then member.chats
+    end
+  end
+
+  def find_mentionable(type:, id:, member:)
+    return unless id.is_a?(String) || id.is_a?(Integer)
+    return if id.blank?
+
+    scope = mentionable_scope(type, member: member)
+    return unless scope
+
+    id.to_s.include?("_") ? scope.find_by_prefix_id(id) : scope.find_by(id: id)
+  end
+
   def admin?(m)
     owner?(m)  # For now, only owner is admin
   end

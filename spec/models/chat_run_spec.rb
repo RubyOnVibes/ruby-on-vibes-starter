@@ -116,7 +116,7 @@ RSpec.describe ChatRun, type: :model do
       run = create_run!(status: :running)
       2.times do |index|
         RubyLLM::ActiveRecord::Usage.create!(
-          chat: chat,
+          chat: chat, owner: run,
           operation: "chat",
           provider: "anthropic",
           model: "claude-sonnet-4-6",

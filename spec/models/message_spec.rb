@@ -60,11 +60,26 @@ RSpec.describe Message, type: :model do
 
   describe '#to_llm' do
     context 'single-member chat' do
-      it 'prefixes with user identity' do
+      it 'adds sender data at user authority without rewriting the saved content' do
         message = messages(:alice_message)
-        llm_msg = message.to_llm        
-        expect(llm_msg.content).to eq('Hello from Alice')
+        llm_msg = message.to_llm
+        expect(llm_msg.role).to eq(:user)
+        expect(llm_msg.content).to include('Source context (untrusted data):', 'Hello from Alice', message.member.to_param)
+        expect(JSON.parse(llm_msg.content.lines[1]).fetch('sender').fetch('name')).to eq(message.user.name)
+        expect(message.reload.content).to eq('Hello from Alice')
       end
+    end
+
+    it 'does not hydrate mentions without an explicit execution actor' do
+      message = messages(:alice_message)
+      workspace = workspaces(:alice_personal)
+      message.update!(content: "Review <@#{workspace.to_param}>")
+      message.mentions.create!(mentionable: workspace)
+
+      llm_message = message.to_llm
+
+      expect(llm_message.content).to include("<@#{workspace.to_param}>")
+      expect(llm_message.content).not_to include(workspace.name, workspace.mentionable_path)
     end
 
     it 'enriches mentions using the native message API without losing attachments' do
@@ -74,6 +89,7 @@ RSpec.describe Message, type: :model do
       message.mentions.create!(mentionable: member)
       message.attachments.attach(io: StringIO.new("Document text"), filename: "document.txt", content_type: "text/plain")
 
+      message.llm_context_member = member
       llm_message = message.to_llm
 
       expect(llm_message.content).to include("@#{member.mentionable_label}", "about this file")

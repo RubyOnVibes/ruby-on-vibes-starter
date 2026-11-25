@@ -20,19 +20,25 @@ class ChatPurpose
     end
   end
 
-  def self.bind(chat:, run:, user_message: nil, options: {})
+  def self.bind(chat:, run:, user_message: nil)
     raise InvalidContext, "The run belongs to another chat" unless run.chat_id == chat.id
     if user_message && user_message.chat_id != chat.id
       raise InvalidContext, "The message belongs to another chat"
     end
 
-    context = ChatAgentContext.new(chat: chat, run: run, user_message: user_message, options: options)
+    context = ChatAgentContext.new(chat: chat, run: run, user_message: user_message)
     unless context.member && chat.member_exists?(context.member)
       raise InvalidContext, "The initiating member no longer has access to this chat"
     end
     if user_message&.member_id && user_message.member_id != context.member.id
       raise InvalidContext, "The message belongs to another initiating member"
     end
+
+    # Set the original actor before native binding loads history. Refresh a
+    # previously bound record so cached source data cannot survive a change in
+    # actor or access; persisted messages and their attachments remain unchanged.
+    chat.llm_context_member = context.member
+    chat.refresh_messages
 
     # Bind the scoped record, rather than using Agent.find's unscoped lookup.
     # Runtime instructions are rebuilt each time without rewriting history.

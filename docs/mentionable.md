@@ -31,13 +31,21 @@ def search_projects(query)
 end
 ```
 
-Done. Users can now @mention projects in chat.
+**3. Add an explicit admission/replay policy.** Extend the type allowlist in
+`MessagesController::MENTIONABLE_TYPES` and the case in
+`Chat#mentionable_scope`. For example, `when "Project" then member.workspace.projects`
+keeps projects in the initiating member's workspace. Preserve the method's
+current-chat membership guard, and apply any additional project visibility rules.
+
+Autocomplete, message admission and replay must agree about which records can
+be shared with the conversation. Add a revoked-access regression when extending
+this policy.
 
 ## How It Works
 
 1. **User types @** -> autocomplete searches via MentionablesController
 2. **User selects** -> mention stored with message
-3. **LLM receives** -> structured context (via RecordContext if available)
+3. **LLM receives** -> a bounded inline summary in user-role content after current actor access is checked
 4. **User clicks** -> navigates to record
 
 ## Customization
@@ -65,9 +73,11 @@ class Project < ApplicationRecord
 end
 ```
 
-## Structured LLM Context (Recommended)
+## Optional structured record data
 
-Create a RecordContext for schema-driven serialization:
+Create a RecordContext when a feature needs an explicit structured serializer.
+The default inline mention path uses `mentionable_summary`; it does not
+automatically attach every RecordContext field:
 
 ```ruby
 # app/models/contexts/project_context.rb
@@ -90,7 +100,10 @@ class ProjectContext < RecordContext
 end
 ```
 
-The Mentionables module auto-discovers `ProjectContext` for `Project` models.
+The Mentionables module discovers `ProjectContext` when feature code explicitly
+calls `project.to_llm_context`. Authorize the record before serialization and
+return its data in tool or user-role content, not application instructions.
+Search scoping alone does not authorize later access or a business effect.
 
 ## Why Search Lives in the Controller
 
@@ -106,5 +119,19 @@ Search logic is explicitly defined per model in `MentionablesController`:
 1. `include Mentionable` in the model
 2. Add searcher method to controller
 3. Register in `SEARCHERS` constant
+4. Extend `MessagesController::MENTIONABLE_TYPES` and `Chat#mentionable_scope`
 
 See `app/controllers/api/v1/mentionables_controller.rb` for examples.
+
+## Replay authorization
+
+`Chat#mentionable_scope` is the shared admission and replay policy. It permits
+current chat members and their workspaces, including cross-workspace group
+participants; another chat must belong to the initiating member's accessible
+chats. When adding a model, extend this explicit policy as well as autocomplete.
+
+`ChatPurpose` sets the original run actor before native history loads. Each
+replay resolves mention IDs through the current scope. Missing actors, unknown
+types and revoked access leave opaque placeholders without loading record
+labels or summaries. Previously saved conversation text remains history; this
+check cannot retract facts already written into a message or summary.

@@ -8,8 +8,6 @@ import useChatMembers from '../../hooks/useChatMembers'
 import useWorkspaceMembers from '../../hooks/useWorkspaceMembers'
 import { MessageList, ConfirmDialog, ChatDropdown, InviteChatModal, ChatMembersList } from '../../components/chat'
 import ChatComposer from '../../components/chat/ChatComposer'
-import AgentTaskPanel from '../../components/chat/AgentTaskPanel'
-import { useAgentTasks } from '../../hooks/useAgentTasks'
 import { validateFile } from '../../utils/fileValidation'
 
 export default function ChatIsland({ containerId }) {
@@ -29,25 +27,15 @@ export default function ChatIsland({ containerId }) {
   // --- Hooks ---
   const { messages, sendMessage, reconcileFromServer, clearMessages } = useTurboChat(chatId)
   const { activeRun, canStop, cancelRun, isAwaitingTasks } = useChatRunState(chatId)
-  const { tasks: agentTasks, cancelTask: cancelAgentTask, dismissTasks: dismissAgentTasks, refetch: refetchAgentTasks } = useAgentTasks(chatId)
   const previousRunRef = useRef(null)
 
-  // Reconcile messages and refresh agent tasks when a run completes
+  // Reconcile persisted messages when a run completes.
   useEffect(() => {
     if (previousRunRef.current && !activeRun) {
       reconcileFromServer()
-      refetchAgentTasks() // Pick up any tasks created by tools during this run
     }
     previousRunRef.current = activeRun
-  }, [activeRun, reconcileFromServer, refetchAgentTasks])
-
-  // Refresh the optional business-task panel when a run waits. Durable server
-  // jobs own continuation; native RubyLLM tasks need not have AgentTask rows.
-  useEffect(() => {
-    if (isAwaitingTasks) {
-      refetchAgentTasks()
-    }
-  }, [isAwaitingTasks, refetchAgentTasks])
+  }, [activeRun, reconcileFromServer])
 
   const { members: chatMembers, removeMember, refetch: refetchMembers } = useChatMembers(chatId)
   const { members: orgMembers } = useWorkspaceMembers()
@@ -226,7 +214,6 @@ export default function ChatIsland({ containerId }) {
     try {
       await clear()
       clearMessages()
-      refetchAgentTasks()
     } catch (error) {
       console.error('Failed to clear chat:', error)
     }
@@ -499,7 +486,7 @@ export default function ChatIsland({ containerId }) {
               isRunActive={!!activeRun}
               showThinking={false}
               isGroupChat={isGroupChatFromBackend}
-              scrollTrigger={agentTasks.length}
+              scrollTrigger={activeRun?.pending_tasks?.length || 0}
             />
           </div>
         </div>
@@ -538,8 +525,14 @@ export default function ChatIsland({ containerId }) {
         )}
       </div>
 
-      {/* Agent task progress panel */}
-      <AgentTaskPanel tasks={agentTasks} onCancel={cancelAgentTask} onDismiss={dismissAgentTasks} />
+      {isAwaitingTasks && (
+        <div className="px-4 py-3 text-sm text-muted-foreground border-t border-border" role="status" aria-live="polite">
+          <p>Waiting for background work</p>
+          {activeRun?.pending_tasks?.map(task => (
+            <p key={task.id} className="mt-1">{task.message || task.status}</p>
+          ))}
+        </div>
+      )}
 
       {/* Chat input */}
       <ChatComposer

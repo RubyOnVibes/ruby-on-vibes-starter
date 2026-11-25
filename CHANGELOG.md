@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Native task consolidation
+
+- Remove the prototype application task runner, effects API, polling panel and synthetic conversation continuations. Native RubyLLM tasks are the only deferred-tool protocol.
+- Keep ordinary Rails jobs and domain operation records responsible for background work, business idempotency, cancellation and evidence. Add an opt-in approval-gated report-publication recipe.
+- Consolidate chat delivery around the original actor and persisted run intent; prevent stale claim retries from failing another delivery.
+- Admit scheduled and webhook triggers through a deduplicated delivery inbox, including events received while a chat is busy.
+- Keep untrusted mentioned-record and summary content out of application instructions; reduce the default assistant context and use generic unexpected-error responses.
+- Align the guides and coding-agent conventions with native purposes, tools and task execution.
+
+This revision targets fresh applications. The fresh schema and migration chain omit the prototype task storage.
+
 ## 2026-11-25 — Durable agent foundations
 
 - Upgrade to Ruby 4.0.10, Rails 8.1.4.1, and RubyLLM 2.2.3, with current security tooling and patched frontend dependencies.
@@ -11,7 +22,7 @@
 
 Validation includes 545 passing starter specs, the matching embedded-template suite, process-level recovery checks, and a separate 560-spec document intake demo with a local browser/worker-restart exercise. Live provider behavior and platform deployment compatibility remain separate validation steps. The repository's existing style-lint backlog remains open.
 
-For existing databases, review [upgrade and migration notes](docs/maintenance-2026-11.md) and back up before migrating. See [agent foundations](docs/agent-foundations.md) for the design and its limits.
+The [maintenance review](docs/maintenance-2026-11.md) records that release snapshot. See [agent foundations](docs/agent-foundations.md) for the current design and its limits.
 
 ## v0.1.0 — Initial public release
 

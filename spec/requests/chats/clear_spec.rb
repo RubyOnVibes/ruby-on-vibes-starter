@@ -33,35 +33,10 @@ RSpec.describe "Chats#clear", type: :request do
       }.to change { chat.chat_runs.count }.to(0)
     end
 
-    it 'sets agent_tasks_dismissed_at to dismiss existing tasks' do
-      expect(chat.agent_tasks_dismissed_at).to be_nil
-
-      post clear_chat_path(chat)
-
-      chat.reload
-      expect(chat.agent_tasks_dismissed_at).to be_present
-      expect(chat.agent_tasks_dismissed_at).to be_within(2.seconds).of(Time.current)
-    end
-
-    it 'does not cancel running agent tasks' do
-      task = AgentTask.create!(
-        chat: chat,
-        workspace: workspace,
-        member: member,
-        kind: "test_task",
-        status: :running
-      )
-
-      post clear_chat_path(chat)
-
-      task.reload
-      expect(task.status).to eq("running")
-    end
-
     it 'deletes messages with tool calls and mentions' do
       # Create assistant message with a tool call
       assistant_msg = chat.messages.create!(role: "assistant", content: "Let me check that.", user: alice, member: member)
-      tool_call = assistant_msg.ruby_llm_tool_calls.create!(name: "echo_agent_task", tool_call_id: "call_123", arguments: {})
+      tool_call = assistant_msg.ruby_llm_tool_calls.create!(name: "current_date_time", tool_call_id: "call_123", arguments: {})
       tool_msg = chat.messages.create!(role: "tool", content: '{"result":"ok"}')
       tool_call.update!(result: tool_msg)
 

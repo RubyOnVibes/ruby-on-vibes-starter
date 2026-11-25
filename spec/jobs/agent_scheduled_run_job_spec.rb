@@ -1,65 +1,58 @@
 # frozen_string_literal: true
 
-require 'rails_helper'
+require "rails_helper"
 
 RSpec.describe AgentScheduledRunJob, type: :job do
-  let(:workspace) { workspaces(:alice_personal) }
   let(:member) { members(:alice_personal_member) }
-
   let(:agent) do
-    chat = Chat.create!(member: member, name: "Scheduled Agent Chat")
-    Agent.create!(
-      workspace: workspace,
-      member: member,
-      chat: chat,
-      name: "Scheduled Agent",
-      identifier: "scheduled_agent",
-      schedule: "0 9 * * 1-5",
-      instructions: "You are a scheduled agent."
-    )
+    Agent.create!(workspace: member.workspace, member: member,
+      chat: Chat.create!(member: member, name: "Scheduled Agent Chat"),
+      name: "Scheduled Agent", identifier: "scheduled_agent", schedule: "0 9 * * 1-5")
   end
 
   before do
+    allow(AgentDeliveryJob).to receive(:perform_later)
     allow(ChatStreamJob).to receive(:perform_later)
   end
 
-  it 'creates a trigger message in the agent chat' do
-    expect {
-      described_class.new.perform(agent.id)
-    }.to change { agent.chat.messages.count }.by(1)
-
-    msg = agent.chat.messages.last
-    expect(msg.role).to eq("user")
-    expect(msg.content).to include("Scheduled run:")
-    expect(msg.user_submitted).to be false
+  it "uses the common inbox and preserves a scheduled trigger" do
+    described_class.perform_now(agent.id, slot: "2026-11-26T09:00Z")
+    delivery = AgentDelivery.last
+    expect(delivery).to have_attributes(trigger: "schedule", initiated_by_member: member, status: "pending")
+    expect(agent.chat.messages.count).to eq(0)
+    AgentDeliveryJob.perform_now(delivery.id)
+    expect(delivery.reload.chat_run.trigger).to eq("schedule")
+    expect(delivery.input_message.content).to include("Scheduled run:")
   end
 
-  it 'uses the durable run itself for schedule tracking' do
-    expect { described_class.new.perform(agent.id) }.not_to change(AgentTask, :count)
-    run = agent.chat.chat_runs.last
-    expect(run.trigger).to eq("schedule")
-    expect(run.initiated_by_member).to eq(member)
-    expect(run.input_message.content).to include("Scheduled run:")
-    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
-  end
-
-  it 'does not create another turn while the first is active' do
-    described_class.new.perform(agent.id)
-    expect { described_class.new.perform(agent.id) }.not_to change(Message, :count)
+  it "deduplicates the same occurrence even after its run completes" do
+    described_class.perform_now(agent.id, slot: "morning-2026-11-26")
+    delivery = AgentDelivery.last
+    AgentDeliveryJob.perform_now(delivery.id)
+    delivery.reload.chat_run.update!(status: :completed)
+    expect { described_class.perform_now(agent.id, slot: "morning-2026-11-26") }.not_to change(AgentDelivery, :count)
     expect(agent.chat.chat_runs.count).to eq(1)
   end
 
-  it 'skips inactive agents' do
-    agent.update!(active: false)
-
-    expect {
-      described_class.new.perform(agent.id)
-    }.not_to change { agent.chat.messages.count }
+  it "deduplicates redelivery of the same queue job without a caller-supplied slot" do
+    job = described_class.new
+    job.perform(agent.id)
+    expect { job.perform(agent.id) }.not_to change(AgentDelivery, :count)
   end
 
-  it 'handles missing agent gracefully' do
-    expect {
-      described_class.new.perform(-1)
-    }.not_to raise_error
+  it "preserves a new occurrence while its chat is busy" do
+    agent.chat.chat_runs.create!(status: :running, initiated_by_member: member)
+    described_class.perform_now(agent.id, slot: "afternoon-2026-11-26")
+    delivery = AgentDelivery.last
+    AgentDeliveryJob.perform_now(delivery.id)
+    expect(delivery.reload).to be_status_pending
+    expect(delivery.chat_run).to be_nil
+    expect(agent.chat.messages.count).to eq(0)
+  end
+
+  it "skips inactive and missing agents" do
+    agent.update!(active: false)
+    expect { described_class.perform_now(agent.id) }.not_to change(AgentDelivery, :count)
+    expect { described_class.perform_now(-1) }.not_to raise_error
   end
 end

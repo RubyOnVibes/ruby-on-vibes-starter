@@ -21,7 +21,6 @@ export { ChatDropdown } from './ChatDropdown'
 export { MentionAutocomplete } from './MentionAutocomplete'
 export { ChatMembersList } from './ChatMembersList'
 export { InviteChatModal } from './InviteChatModal'
-export { default as AgentTaskPanel } from './AgentTaskPanel'
 
 // NOTE: TaggedElement is platform-specific (file browser integration)
 // Not included in template - use MentionChip with prefix_id pattern instead

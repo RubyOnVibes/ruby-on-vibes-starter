@@ -1,30 +1,16 @@
 # frozen_string_literal: true
 
-##
-# AgentScheduledRunJob - Triggers a scheduled agent run.
-#
-# Called by SolidQueue recurring schedule. Creates a trigger message
-# in the agent's chat, creates an AgentTask for tracking, and enqueues
-# a ChatStreamJob to generate the agent's response.
-#
-# The agent's creator member is the actor for scheduled runs.
-# The trigger column on AgentTask distinguishes this from human-initiated work.
-#
-class AgentScheduledRunJob < SolidQueueJob
-  def perform(agent_id)
+# Scheduled events use the same durable inbox and execution path as webhooks.
+# A scheduler can supply a stable occurrence key (slot). Without one, repeated
+# delivery of this serialized Active Job is deduplicated by its job_id.
+class AgentScheduledRunJob < ApplicationJob
+  queue_as :agents
+
+  def perform(agent_id, slot: nil)
     agent = Agent.find_by(id: agent_id)
     return unless agent&.active?
 
-    chat = agent.chat
-    member = agent.member
-
-    chat.with_lock do
-      return if chat.chat_runs.active.exists? || chat.running?
-      trigger_message = chat.messages.create!(role: :user,
-        content: "Scheduled run: #{Time.current.iso8601}", user_submitted: false)
-      @run = chat.chat_runs.create!(status: :pending, initiated_by_member: member,
-        input_message: trigger_message, trigger: "schedule")
-    end
-    @run.dispatch!
+    key = slot.present? ? "slot:#{slot}" : "job:#{job_id}"
+    AgentDelivery.accept!(agent: agent, trigger: "schedule", idempotency_key: key).dispatch!
   end
 end

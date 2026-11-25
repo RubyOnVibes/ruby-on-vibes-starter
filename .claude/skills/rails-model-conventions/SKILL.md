@@ -195,6 +195,11 @@ end
 
 **CRITICAL: Update the controller when adding mentionables.** Search logic lives in `app/controllers/api/v1/mentionables_controller.rb`. When you make a model mentionable, you MUST also add a searcher method to the controller and register it in the `SEARCHERS` constant. Read that file for the pattern.
 
+Also extend `MessagesController::MENTIONABLE_TYPES` and `Chat#mentionable_scope`
+with an explicit record scope. The latter is shared by message admission and
+replay: adding autocomplete alone does not authorize record hydration. Keep the
+current actor/chat membership guard and test access revocation on a later run.
+
 **Do NOT hallucinate methods** - The concern has NO class methods. Read the file if unsure.
 
 ## RecordContext (LLM Context Serialization)

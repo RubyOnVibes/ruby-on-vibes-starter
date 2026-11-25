@@ -11,11 +11,7 @@ class MessagesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat, only: [:create]
 
-  MENTIONABLE_RESOLVERS = {
-    "Chat" => :resolve_chat_mention,
-    "Member" => :resolve_member_mention,
-    "Workspace" => :resolve_workspace_mention
-  }.freeze
+  MENTIONABLE_TYPES = %w[Chat Member Workspace].freeze
   
   # POST /messages
   # POST /chats/:chat_id/messages
@@ -108,13 +104,13 @@ class MessagesController < ApplicationController
       label = mention[:label] || mention['label']
 
       unless model_type && mentioned_id.present?
-        Rails.logger.warn "[Mention] Skipped unknown mention type: #{mention.inspect}"
+        Rails.logger.warn "[Mention] Skipped invalid mention for chat=#{@chat.id}"
         next
       end
 
       Rails.logger.info "[Mention] Processing: #{model_type}##{mentioned_id}"
 
-      record = send(MENTIONABLE_RESOLVERS.fetch(model_type), mentioned_id)
+      record = @chat.find_mentionable(type: model_type, id: mentioned_id, member: current_member)
       unless record
         Rails.logger.warn "[Mention] Could not resolve in scope: #{model_type}##{mentioned_id}"
         next
@@ -127,50 +123,16 @@ class MessagesController < ApplicationController
         record: record
       }
     rescue StandardError => e
-      Rails.logger.error "[Mention] Failed to resolve mention: #{e.message}"
-      Rails.logger.error e.backtrace.first(5).join("\n")
+      Rails.logger.error "[Mention] Resolution failed chat=#{@chat.id} error=#{e.class.name}"
       nil
     end
   end
 
   def normalize_mention_type(model_type)
     type = model_type.to_s.classify
-    MENTIONABLE_RESOLVERS.key?(type) ? type : nil
+    MENTIONABLE_TYPES.include?(type) ? type : nil
   end
 
-  def resolve_chat_mention(mentioned_id)
-    find_scoped_mention(current_member.chats, mentioned_id)
-  end
-
-  def resolve_member_mention(mentioned_id)
-    return unless @chat
-
-    find_scoped_mention(@chat.members, mentioned_id)
-  end
-
-  def resolve_workspace_mention(mentioned_id)
-    scope = if @chat
-      Workspace.where(id: @chat.members.select(:workspace_id))
-    else
-      current_user.workspaces
-    end
-
-    find_scoped_mention(scope, mentioned_id)
-  end
-
-  def find_scoped_mention(scope, mentioned_id)
-    return if mentioned_id.blank?
-
-    if mentioned_id.to_s.include?('_') && scope.klass.respond_to?(:find_by_prefix_id)
-      record = scope.klass.find_by_prefix_id(mentioned_id)
-      return record if record && scope.exists?(id: record.id)
-    else
-      return scope.find_by(id: mentioned_id)
-    end
-
-    nil
-  end
-  
   ##
   # Substitute display labels with stable ID placeholders
   # "Hey @Chat 2" → "Hey <@chat_xxx>"

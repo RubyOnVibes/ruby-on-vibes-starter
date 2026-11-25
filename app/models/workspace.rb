@@ -14,6 +14,7 @@
 #   )
 #
 class Workspace < ApplicationRecord
+  has_many :example_report_publications, class_name: "Examples::ReportPublication", inverse_of: :workspace, dependent: :destroy
   has_prefix_id :ws
 
   include Mentionable
@@ -30,7 +31,6 @@ class Workspace < ApplicationRecord
   has_many :members, dependent: :destroy
   has_many :users, through: :members
   has_many :chats, through: :members
-  has_many :agent_tasks, dependent: :destroy  # Denormalized for direct workspace-level queries
   has_many :agents, dependent: :destroy  # Persistent agents belonging to this workspace
 
   before_create :ensure_owner_admin_built

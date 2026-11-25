@@ -1,175 +1,99 @@
 # frozen_string_literal: true
 
-require 'rails_helper'
+require "rails_helper"
 
 RSpec.describe "Webhooks", type: :request do
-  let(:workspace) { workspaces(:alice_personal) }
   let(:member) { members(:alice_personal_member) }
-
   let(:agent) do
-    chat = Chat.create!(member: member, name: "Webhook Agent Chat")
-    Agent.create!(
-      workspace: workspace,
-      member: member,
-      chat: chat,
-      name: "Webhook Agent",
-      identifier: "webhook_agent",
-      instructions: "You handle webhooks."
-    )
+    Agent.create!(workspace: member.workspace, member: member,
+      chat: Chat.create!(member: member, name: "Webhook Agent Chat"),
+      name: "Webhook Agent", identifier: "webhook_agent")
   end
+  let(:headers) { { "CONTENT_TYPE" => "application/json", "Idempotency-Key" => "delivery-123" } }
 
   before do
     allow(RubyOnVibes).to receive(:agents?).and_return(true)
-    allow(AgentWebhookRunJob).to receive(:perform_later)
+    allow(AgentDeliveryJob).to receive(:perform_later)
   end
 
-  describe "POST /api/v1/hooks/:token" do
-    it 'accepts valid webhook and returns 202' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{"event":"push","ref":"main"}',
-        headers: { "CONTENT_TYPE" => "application/json", "X-Event-Type" => "push" }
+  def receive_event(body = '{"event":"push"}', event_headers = headers)
+    post "/api/v1/hooks/#{agent.webhook_token}", params: body, headers: event_headers
+  end
 
-      expect(response).to have_http_status(:accepted)
-    end
+  it "accepts one durable receipt without exposing the event to a running conversation" do
+    agent
+    expect { receive_event }.to change(AgentDelivery, :count).by(1).and change(Message, :count).by(0)
+    expect(response).to have_http_status(:accepted)
+    delivery = AgentDelivery.last
+    expect(JSON.parse(response.body)).to eq("delivery_id" => delivery.to_param)
+    expect(delivery.payload).to eq('{"event":"push"}')
+    expect(delivery.initiated_by_member).to eq(member)
+    expect(AgentDeliveryJob).to have_received(:perform_later).with(delivery.id)
+  end
 
-    it 'creates a trigger message in the agent chat' do
-      expect {
-        post "/api/v1/hooks/#{agent.webhook_token}",
-          params: '{"event":"push"}',
-          headers: { "CONTENT_TYPE" => "application/json", "X-Event-Type" => "deployment" }
-      }.to change { agent.chat.messages.count }.by(1)
+  it "returns the same receipt for an identical retry" do
+    receive_event
+    first_id = response.parsed_body["delivery_id"]
+    expect { receive_event }.not_to change(AgentDelivery, :count)
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body["delivery_id"]).to eq(first_id)
+  end
 
-      msg = agent.chat.messages.last
-      expect(msg.role).to eq("user")
-      expect(msg.content).to include("Webhook received: deployment")
-      expect(msg.user_submitted).to be false
-    end
+  it "rejects a delivery key reused for different data without replacing the accepted payload" do
+    receive_event
+    receive_event('{"event":"changed"}')
+    expect(response).to have_http_status(:conflict)
+    expect(AgentDelivery.count).to eq(1)
+    expect(AgentDelivery.last.payload).to eq('{"event":"push"}')
+  end
 
-    it 'creates an AgentTask with trigger: webhook' do
-      expect {
-        post "/api/v1/hooks/#{agent.webhook_token}",
-          params: '{"data":"test"}',
-          headers: { "CONTENT_TYPE" => "application/json" }
-      }.to change { AgentTask.count }.by(1)
+  it "includes the event type in delivery identity" do
+    receive_event("{}", headers.merge("X-Event-Type" => "created"))
+    receive_event("{}", headers.merge("X-Event-Type" => "deleted"))
+    expect(response).to have_http_status(:conflict)
+  end
 
-      task = AgentTask.last
-      expect(task.kind).to eq("webhook_run")
-      expect(task.trigger).to eq("webhook")
-      expect(task.metadata["webhook_payload"]).to eq("data" => "test")
-    end
+  it "accepts plain text and Github event/delivery headers" do
+    receive_event("plain text payload", { "CONTENT_TYPE" => "text/plain", "X-GitHub-Event" => "push", "X-GitHub-Delivery" => "github-1" })
+    expect(response).to have_http_status(:accepted)
+    expect(AgentDelivery.last).to have_attributes(payload: "plain text payload", event_type: "push", idempotency_key: "github-1")
+  end
 
-    it 'enqueues AgentWebhookRunJob' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{}',
-        headers: { "CONTENT_TYPE" => "application/json" }
+  it "accepts separate events when no idempotency key was supplied" do
+    2.times { receive_event("{}", { "CONTENT_TYPE" => "application/json" }) }
+    expect(AgentDelivery.count).to eq(2)
+  end
 
-      expect(AgentWebhookRunJob).to have_received(:perform_later).with(agent.id, anything)
-    end
+  it "keeps the accepted event when queue enqueueing fails" do
+    allow(AgentDeliveryJob).to receive(:perform_later).and_raise(ActiveJob::EnqueueError, "queue unavailable")
+    receive_event
+    expect(response).to have_http_status(:accepted)
+    expect(AgentDelivery.last).to be_status_pending
+  end
 
-    it 'returns 404 for invalid token' do
-      post "/api/v1/hooks/invalid_token_here",
-        params: '{}',
-        headers: { "CONTENT_TYPE" => "application/json" }
+  it "rejects oversized bodies instead of accepting truncated data" do
+    expect { receive_event("x" * (1.megabyte + 1), { "CONTENT_TYPE" => "text/plain" }) }.not_to change(AgentDelivery, :count)
+    expect(response).to have_http_status(:content_too_large)
+  end
 
-      expect(response).to have_http_status(:not_found)
-    end
+  it "rejects oversized event headers" do
+    receive_event("{}", headers.merge("X-Event-Type" => "x" * 256))
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(AgentDelivery.count).to eq(0)
+  end
 
-    it 'returns 404 for inactive agent (does not leak token validity)' do
-      agent.update!(active: false)
+  it "refuses invalid or disabled tokens without leaking validity" do
+    post "/api/v1/hooks/invalid", params: "{}", headers: headers
+    expect(response).to have_http_status(:not_found)
+    agent.update!(active: false)
+    receive_event
+    expect(response).to have_http_status(:not_found)
+  end
 
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{}',
-        headers: { "CONTENT_TYPE" => "application/json" }
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it 'handles non-JSON payloads gracefully' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: "plain text payload",
-        headers: { "CONTENT_TYPE" => "text/plain" }
-
-      expect(response).to have_http_status(:accepted)
-
-      task = AgentTask.last
-      expect(task.metadata["webhook_payload"]).to include("plain text payload")
-    end
-
-    it 'uses X-Event-Type for event label' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{}',
-        headers: { "CONTENT_TYPE" => "application/json", "X-Event-Type" => "deploy" }
-
-      msg = agent.chat.messages.last
-      expect(msg.content).to include("Webhook received: deploy")
-    end
-
-    it 'falls back to "external event" when no event header' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{"data":true}',
-        headers: { "CONTENT_TYPE" => "application/json" }
-
-      msg = agent.chat.messages.last
-      expect(msg.content).to include("Webhook received: external event")
-    end
-
-    it 'truncates large payloads in message content' do
-      large_payload = { data: "x" * 3000 }.to_json
-
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: large_payload,
-        headers: { "CONTENT_TYPE" => "application/json" }
-
-      msg = agent.chat.messages.last
-      expect(msg.content.length).to be < large_payload.length
-    end
-
-    it 'returns task_id in response body' do
-      post "/api/v1/hooks/#{agent.webhook_token}",
-        params: '{}',
-        headers: { "CONTENT_TYPE" => "application/json" }
-
-      body = JSON.parse(response.body)
-      expect(body["task_id"]).to start_with("agent_task_")
-    end
-
-    context 'idempotency' do
-      it 'deduplicates retries with the same Idempotency-Key' do
-        headers = { "CONTENT_TYPE" => "application/json", "Idempotency-Key" => "delivery-abc-123" }
-
-        post "/api/v1/hooks/#{agent.webhook_token}", params: '{"n":1}', headers: headers
-        expect(response).to have_http_status(:accepted)
-        first_task_id = JSON.parse(response.body)["task_id"]
-
-        post "/api/v1/hooks/#{agent.webhook_token}", params: '{"n":1}', headers: headers
-        expect(response).to have_http_status(:ok)
-        expect(JSON.parse(response.body)["task_id"]).to eq(first_task_id)
-
-        expect(AgentTask.where(idempotency_key: "delivery-abc-123").count).to eq(1)
-      end
-
-      it 'creates separate tasks for different idempotency keys' do
-        post "/api/v1/hooks/#{agent.webhook_token}",
-          params: '{}',
-          headers: { "CONTENT_TYPE" => "application/json", "Idempotency-Key" => "key-1" }
-
-        post "/api/v1/hooks/#{agent.webhook_token}",
-          params: '{}',
-          headers: { "CONTENT_TYPE" => "application/json", "Idempotency-Key" => "key-2" }
-
-        expect(AgentTask.count).to eq(2)
-      end
-
-      it 'skips dedup when no Idempotency-Key header' do
-        2.times do
-          post "/api/v1/hooks/#{agent.webhook_token}",
-            params: '{}',
-            headers: { "CONTENT_TYPE" => "application/json" }
-          expect(response).to have_http_status(:accepted)
-        end
-
-        expect(AgentTask.count).to eq(2)
-      end
-    end
+  it "does not accept events when persistent agents are disabled" do
+    allow(RubyOnVibes).to receive(:agents?).and_return(false)
+    receive_event
+    expect(response).to have_http_status(:not_found)
+    expect(AgentDelivery.count).to eq(0)
   end
 end

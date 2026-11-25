@@ -16,7 +16,7 @@
 # provisioning, or manually by users through the UI.
 #
 # The agent's creator member is the "actor" for automated runs (scheduled, webhook).
-# The `trigger` column on AgentTask distinguishes human-initiated from automated work.
+# AgentDelivery records inbound events; ChatRun records their authorized execution.
 #
 class Agent < ApplicationRecord
   has_prefix_id :agent
@@ -27,7 +27,7 @@ class Agent < ApplicationRecord
   belongs_to :member        # creator/owner — automated runs act on their behalf
   belongs_to :chat
 
-  has_many :agent_tasks, through: :chat
+  has_many :agent_deliveries, dependent: :destroy, inverse_of: :agent
 
   validates :name, presence: true
   validates :identifier, presence: true,

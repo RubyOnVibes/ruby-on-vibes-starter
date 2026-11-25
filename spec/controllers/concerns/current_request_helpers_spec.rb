@@ -13,7 +13,7 @@ RSpec.describe CurrentRequestHelpers, type: :model do
       def initialize
         @params = {}
         @session = {}
-        @request = OpenStruct.new(uuid: 'test-uuid', ip: '127.0.0.1', user_agent: 'TestAgent')
+        @request = Struct.new(:uuid, :ip, :user_agent).new('test-uuid', '127.0.0.1', 'TestAgent')
       end
 
       def user_signed_in?

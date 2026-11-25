@@ -20,22 +20,22 @@ This file provides essential context for AI coding agents working on this Rails 
 
 ## AI Systems Architecture
 
-This app ships with AI-native infrastructure. These systems are dormant until used — no overhead if unused.
+This app integrates Rails application boundaries with native RubyLLM execution. Run a durable queue worker alongside the web process; recovery and automation delivery use recurring jobs.
 
 | System | What It Does | Key Files |
 |--------|-------------|-----------|
 | **Chat** | User ↔ AI conversations with streaming | `app/models/chat.rb`, `app/jobs/chat_stream_job.rb` |
-| **Tools** | Inline actions during chat (fast, synchronous) | `app/tools/*.rb`, `app/services/toolset_service.rb` |
-| **Agent Tasks** | Background work with progress tracking | `app/models/agent_task.rb`, `app/jobs/agent_task_job.rb` |
-| **Persistent Agents** | Named autonomous workers with identity + memory | `app/models/agent.rb`, `config/agent_blueprints.yml` |
+| **Tools** | Authorized application operations, declared on each purpose | `app/tools/*.rb`, `app/agents/*.rb` |
+| **Deferred tools** | Native `RubyLLM::Task` pauses and resumes; normal Rails jobs perform work | `docs/native-task-recipe.md`, `app/jobs/chat_stream_job.rb` |
+| **Persistent Agents** | Workspace worker identities and trigger configuration | `app/models/agent.rb`, `config/agent_blueprints.yml` |
 | **Webhooks** | External events trigger agent runs | `app/controllers/api/v1/webhooks_controller.rb` |
 
 **When to use what:**
-- **Tool** → completes in <10s, result needed in conversation (e.g., look up a record, fetch a URL)
-- **Agent Task** → long-running background work with progress (e.g., process CSV, send batch emails)
-- **Persistent Agent** → autonomous worker triggered by schedule or webhook (e.g., daily report, Stripe event handler)
+- **Tool** → a short read or authorized operation whose result belongs in the conversation.
+- **Native task + Rails job** → defer slow work; persist an operation reference, then resume the same tool call. Application records own progress, cancellation and business idempotency.
+- **Persistent Agent** → a configured worker triggered by a schedule or webhook. `AgentDelivery` durably admits these triggers into `ChatRun`.
 
-**Deep docs:** `docs/building_with_agents.md` (tools + tasks), `docs/webhooks.md` (webhook integration)
+**Deep docs:** `docs/building_with_agents.md` (native tools + tasks), `docs/native-task-recipe.md` (tested business operation), `docs/webhooks.md` (trigger delivery)
 
 ---
 
@@ -144,12 +144,11 @@ There is no `LLM_PROVIDER` environment setting in this starter.
 | --- | --- |
 | `RubyOnVibes.llm?` | Whether the application exposes its LLM features |
 | `RubyOnVibes.chat?` | Chat UI visibility; defaults to `llm?` |
-| `RubyOnVibes.agent_tasks?` | Background-task feature visibility; defaults to `chat?` |
 | `RubyOnVibes.agents?` | Persistent application agents; independently gated below |
 
 `LLMS_ENABLED=true` can expose the UI during development, but does not provide
 credentials or make provider calls work. `LLMS_ENABLED=false` explicitly
-disables the default chat and task feature gates even when keys are configured.
+disables the default chat feature gate even when keys are configured.
 `AGENTS_ENABLED=true` is a separate development override: it still exposes
 persistent agents despite `LLMS_ENABLED=false`. Leave `LLMS_ENABLED` unset to
 detect configured providers. Restart after changing environment settings.
@@ -166,7 +165,9 @@ precedence. Normal local development does not require these platform variables.
 - Subclass `ApplicationAgent` for native `RubyLLM::Agent` behavior. The database
   `Agent` model is the separate workspace/scheduling system.
 - Use `Schematist::Schema` and `response.parsed` for structured output.
-- Register UI tools in `ToolsetService`; the chat job rebuilds them each run.
+- Declare feature tools with `tools` on their named `ApplicationAgent` purpose. `ToolsetService` configures the default assistant and allowlists database-backed Agent selections; a feature tool need not become a default tool.
+- Declare tool input with `parameters do`; keep provider request options separate. Never expose raw exception messages to tools or chat participants.
+- Keep record/document content and compaction summaries in lower-trust message/tool content. Instructions contain application policy and trusted agent configuration; text from a record does not grant permission.
 - RubyLLM 2.2 uses `pending_questions`, `approve`, `decline`, and `answer`.
   Keep workspace authorization and audit metadata in `ChatRun`; do not write
   internal tool approval columns directly.
@@ -180,10 +181,10 @@ precedence. Normal local development does not require these platform variables.
   Do not add `ruby_llm-mcp` alongside core MCP, or the old evaluation/tracing
   placeholder packages. Add `mxc` only when sandboxed code execution is needed.
 
-Read `docs/building_with_agents.md` for examples and
-`docs/rubyllm-upgrade.md` for migrations and platform compatibility. The sibling
-platform and its embedded template have independent dependencies; a starter
-upgrade does not upgrade either automatically.
+Read `docs/building_with_agents.md` for examples. The starter targets fresh
+applications. `docs/rubyllm-upgrade.md` records historical dependency work and
+separate platform plans. Syncing shared template source does not upgrade the
+platform application or certify its runtime compatibility.
 
 ### Persistent Agents Toggle
 
@@ -193,14 +194,14 @@ Separate from the LLM toggle, persistent agents (Manager, webhooks, scheduled ru
 def self.agents?
   return true if ENV['AGENTS_ENABLED'] == 'true' # dev override
   agents_enabled = true  # ← CHANGE THIS to false to disable persistent agents
-  agents_enabled && agent_tasks?
+  agents_enabled && chat?
 end
 ```
 
 **To disable persistent agents**: Change `agents_enabled = true` to `agents_enabled = false`
 
 Unset `AGENTS_ENABLED=true` as well; that development override takes precedence
-over the code flag and the default chat/task gates.
+over the code flag and the default chat gate.
 
 **To re-enable persistent agents**: Change `agents_enabled = false` to `agents_enabled = true`
 
