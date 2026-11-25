@@ -17,7 +17,7 @@ class ChatStreamJob < ApplicationJob
     return if @chat_run.status_awaiting_approval? || @chat_run.chat.running?
     if @chat_run.status_awaiting_tasks?
       tasks = @chat_run.chat.pending_tasks
-      return if tasks.any? && tasks.all?(&:input_required?)
+      return if tasks.any?(&:input_required?)
     end
 
     setup_chat(@chat_run.chat_id, @chat_run.input_message_id)
@@ -38,12 +38,13 @@ class ChatStreamJob < ApplicationJob
       tasks = @chat.pending_tasks
       if tasks.any?
         @chat_run.transition_to_awaiting_tasks!
-        working = tasks.reject(&:input_required?)
-        if working.any?
-          interval = working.map { |task| task.poll_interval.to_f.positive? ? task.poll_interval.to_f : 5 }.min.clamp(1, 300)
-          @chat_run.dispatch!(wait: interval)
-        else
+        # complete resumes every pending task, so a human wait parks the
+        # whole conversation. Domain jobs may continue independently.
+        if tasks.any?(&:input_required?)
           @chat_run.update!(resume_at: nil)
+        else
+          interval = tasks.map { |task| task.poll_interval.to_f.positive? ? task.poll_interval.to_f : 5 }.min.clamp(1, 300)
+          @chat_run.dispatch!(wait: interval)
         end
       else
         @chat_run.update!(status: :completed, resume_at: nil)

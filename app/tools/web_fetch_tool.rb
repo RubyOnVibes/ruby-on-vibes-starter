@@ -6,6 +6,9 @@ require "ipaddr"
 require "socket"
 
 class WebFetchTool < RubyLLM::Tool
+  # Only application-controlled validation messages use this expected failure.
+  class FetchError < StandardError; end
+
   description <<~DESC
     Fetches a web page and returns its text content.
 
@@ -107,20 +110,20 @@ class WebFetchTool < RubyLLM::Tool
       "Content from #{url}:\n\n#{text}"
     end
   rescue URI::InvalidURIError
-    { error: "Invalid URL format: #{url}" }
+    { error: "Invalid URL format" }
   rescue Net::OpenTimeout, Net::ReadTimeout
     { error: "Request timed out after #{REQUEST_TIMEOUT}s" }
-  rescue SocketError => e
-    { error: "Could not connect: #{e.message}" }
-  rescue => e
-    { error: "Failed to fetch URL: #{e.message}" }
+  rescue SocketError
+    { error: "Could not connect to the requested host" }
+  rescue FetchError => error
+    { error: error.message }
   end
 
   private
 
   def fetch_with_redirects(uri, limit = MAX_REDIRECTS)
-    raise "Too many redirects" if limit == 0
-    raise "Invalid URL: must start with http:// or https://" unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
+    raise FetchError, "Too many redirects" if limit == 0
+    raise FetchError, "Invalid URL: must start with http:// or https://" unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
 
     resolved_ip = resolve_public_address!(uri)
     http = Net::HTTP.new(uri.host, uri.port)
@@ -138,7 +141,7 @@ class WebFetchTool < RubyLLM::Tool
     case response
     when Net::HTTPSuccess
       body = response.body
-      raise "Response too large (#{body.bytesize} bytes)" if body.bytesize > MAX_RESPONSE_BYTES
+      raise FetchError, "Response exceeds the download limit" if body.bytesize > MAX_RESPONSE_BYTES
       [ body, response["content-type"].to_s ]
     when Net::HTTPRedirection
       location = response["location"]
@@ -146,27 +149,27 @@ class WebFetchTool < RubyLLM::Tool
       new_uri = URI.join(uri, location) unless new_uri.host
       fetch_with_redirects(new_uri, limit - 1)
     else
-      raise "HTTP #{response.code}: #{response.message}"
+      raise FetchError, "The remote server returned HTTP #{response.code.to_i}"
     end
   end
 
   def resolve_public_address!(uri)
     addresses = Socket.getaddrinfo(uri.host, uri.port, nil, :STREAM).map { |addr| addr[3] }.uniq
-    raise "Could not resolve hostname: #{uri.host}" if addresses.blank?
+    raise FetchError, "Could not resolve the requested host" if addresses.blank?
 
     addresses.each { |address| validate_public_ip!(address) }
     addresses.first
   rescue SocketError
-    raise "Could not resolve hostname: #{uri.host}"
+    raise FetchError, "Could not resolve the requested host"
   end
 
   def validate_public_ip!(address)
     ip = IPAddr.new(address)
     return unless BLOCKED_IP_RANGES.any? { |range| range.include?(ip) }
 
-    raise "Requests to private/internal networks are not allowed"
+    raise FetchError, "Requests to private/internal networks are not allowed"
   rescue IPAddr::InvalidAddressError
-    raise "Could not resolve hostname to a valid address"
+    raise FetchError, "Could not resolve the requested host"
   end
 
   def html_content?(content_type)

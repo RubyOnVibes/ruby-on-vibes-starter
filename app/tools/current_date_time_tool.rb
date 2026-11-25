@@ -55,9 +55,7 @@ class CurrentDateTimeTool < RubyLLM::Tool
     end
 
     { current_time: result, timezone: tz }
-  rescue ArgumentError => e
+  rescue ArgumentError
     { error: "Invalid timezone: #{timezone}" }
-  rescue => e
-    { error: e.message }
   end
 end

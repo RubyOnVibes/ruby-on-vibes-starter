@@ -21,7 +21,11 @@ prevents a new HTTP message from starting another turn in that conversation.
 task polls. A live claim belongs to its worker; a stale duplicate delivery must
 not fail or complete that worker's run. A persisted question waits for an
 authorized answer. An `input_required` task waits until an application callback
-calls `run.resume_tasks!(explicit: true)`.
+calls `run.resume_tasks!(explicit: true)`. Because native `complete` resumes
+every pending task, a mixed round containing an `input_required` task also parks
+the whole conversation. Its ordinary domain jobs can keep working; automatic
+conversation polling resumes once the callback resolves the human wait. A tool's
+`resume` must still verify the external/domain state before completing an action.
 
 ## Deferred work
 
@@ -72,6 +76,10 @@ tools. A feature purpose can declare a smaller toolset directly.
 Native approval/question endpoints authorize decisions and record the decider.
 The default permits requester confirmation or a chat-owner decision. Products
 requiring a distinct approver must enforce that business policy explicitly.
+The starter resumes a turn once all of its outstanding questions are answered.
+Give independently reviewable business records their own conversations/runs; a
+batch action can dispatch a bounded set without making one invoice's approval
+wait for every other invoice.
 Cancellation calls native cancellation and retains completed messages/results.
 Solid Cable carries worker updates; partial streaming text remains transient.
 

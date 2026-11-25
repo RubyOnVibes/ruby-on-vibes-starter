@@ -176,6 +176,67 @@ RSpec.describe ChatPurpose do
     expect(chat.messages.where(role: :assistant).last.content).to eq("Reviewed.")
   end
 
+  it "composes purpose callbacks with worker callbacks through a real tool completion" do
+    events = []
+    tool_class = Class.new(RubyLLM::Tool) do
+      description "Exercise purpose callbacks"
+      define_method(:execute) { events << :execute; "Reviewed" }
+    end
+    stub_const("PurposeCallbackTool", tool_class)
+    agent_class = Class.new(ApplicationAgent) do
+      instructions "Review the supplied record"
+      tools PurposeCallbackTool
+      before_tool_call { events << :purpose_before_tool }
+      after_message { |item| events << [ :purpose_after_message, item.role ] }
+    end
+    stub_const("PurposeCallbackAgent", agent_class)
+    allow(described_class).to receive(:registry).and_return("callbacks" => PurposeCallbackAgent)
+    chat.update!(purpose: "callbacks")
+    chat.messages.destroy_all
+    input = chat.messages.create!(role: :user, content: "Review it", member: member, user: member.user)
+    execution = chat.chat_runs.create!(input_message: input, initiated_by_member: member)
+    stub_replies tool_call(:purpose_callback), "Done"
+
+    ChatStreamJob.perform_now(execution.id)
+
+    expect(execution.reload).to be_status_completed
+    expect(events.index(:purpose_before_tool)).to be < events.index(:execute)
+    expect(events).to include([ :purpose_after_message, :assistant ], [ :purpose_after_message, :tool ])
+  end
+
+  it "preserves the explicitly selected Rails chat model through native task resume and usage" do
+    tool_class = Class.new(RubyLLM::Tool) do
+      description "Defer a model-selection probe"
+      def execute = RubyLLM::Task.new(status: :working, poll_interval: 1)
+      def resume(*) = "Reviewed"
+    end
+    stub_const("PurposeModelTool", tool_class)
+    agent_class = Class.new(ApplicationAgent) do
+      # Native binding preserves an existing record's model, even when the
+      # agent would select a different model for a new standalone chat.
+      model "claude-sonnet-4-6"
+      instructions "Review the supplied record"
+      tools PurposeModelTool
+    end
+    stub_const("PurposeModelAgent", agent_class)
+    allow(described_class).to receive(:registry).and_return("model_probe" => PurposeModelAgent)
+    selected_chat = Chat.create!(member: member, purpose: "model_probe")
+    selected_chat.with_model("gpt-5-nano", provider: :openai)
+    input = selected_chat.messages.create!(role: :user, content: "Review it", member: member, user: member.user)
+    execution = selected_chat.chat_runs.create!(input_message: input, initiated_by_member: member)
+    stub_replies tool_call(:purpose_model), "Done", cost: 0.01
+
+    ChatStreamJob.perform_now(execution.id)
+    expect(execution.reload).to be_status_awaiting_tasks
+    ChatStreamJob.perform_now(execution.id)
+
+    expect(execution.reload).to be_status_completed
+    expect(Chat.find(selected_chat.id).model.model_id).to eq("gpt-5-nano")
+    expect(execution.usage_summary.fetch("models")).to eq([ "gpt-5-nano" ])
+    expect(execution.owned_llm_usages.count).to eq(2)
+    expect(selected_chat.messages.where(role: :user).count).to eq(1)
+  end
+
   it "keeps usage owned by the run and files shared across runs" do
     chat.messages.where(role: :assistant).destroy_all
     stub_replies "Ready.", cost: 0.01

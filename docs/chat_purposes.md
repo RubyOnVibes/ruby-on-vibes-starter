@@ -67,6 +67,27 @@ outside that job must establish their own usage owner explicitly. Do not set
 ownership. A purpose's `file_store` uses the shared authorized chat and Rails
 Active Storage.
 
+A persisted chat's model is authoritative. Native `Agent.new(chat: ...)` binding
+preserves it; adding `model "..."` to a purpose does not switch existing Rails
+chats. That declaration chooses the model when the native agent creates a new
+chat through its own creation APIs, or builds a standalone chat.
+
+For a new application chat, choose and persist the model explicitly before
+adding its input or run:
+
+```ruby
+# In an authorized application flow; choose the model in application code.
+chat = Chat.create!(member: current_member, purpose: "document_review")
+chat.with_model("gpt-5-nano", provider: :openai)
+# Now create its message and ChatRun through the normal delivery path.
+```
+
+Without an explicit selection, a fresh chat uses the configured RubyLLM default
+(`LLM_MODEL` when set). Model changes are application decisions: do not change
+one during an active run. Binding and worker resume preserve the persisted
+selection. For comparisons, pin the same model/provider before creating work,
+disable fallbacks, and confirm the actual model in the run's usage records.
+
 `LLM_FALLBACK_MODELS` explicitly overrides model fallbacks. Configure credentials
 and verify tool/schema support for every listed model; fallback changes may alter
 provider choice and billing.

@@ -31,6 +31,37 @@ RSpec.describe WebFetchTool do
       expect(result[:error]).to include("private/internal networks")
     end
 
+    it "does not expose resolver exception details in a tool result" do
+      allow(Socket).to receive(:getaddrinfo).and_raise(SocketError, "private DNS configuration at /secret/path")
+
+      result = tool.execute(url: "https://example.com")
+
+      expect(result).to eq(error: "Could not resolve the requested host")
+    end
+
+    it "lets unexpected infrastructure errors reach the application error handler" do
+      allow(Socket).to receive(:getaddrinfo).and_raise(RuntimeError, "private adapter details")
+
+      expect { tool.execute(url: "https://example.com") }.to raise_error(RuntimeError, "private adapter details")
+    end
+
+    it "preserves the HTTP status without exposing the remote reason phrase or body" do
+      response = Net::HTTPTooManyRequests.new("1.1", "429", "private upstream account details")
+      response.instance_variable_set(:@read, true)
+      response.body = "private upstream credentials"
+      http = instance_double(Net::HTTP)
+      %i[ipaddr= use_ssl= open_timeout= read_timeout=].each do |setter|
+        allow(http).to receive(setter)
+      end
+      allow(http).to receive(:request).and_return(response)
+      allow(Net::HTTP).to receive(:new).and_return(http)
+      allow(Socket).to receive(:getaddrinfo).and_return([
+        [ "AF_INET", 443, "example.com", "93.184.216.34" ]
+      ])
+
+      expect(tool.execute(url: "https://example.com")).to eq(error: "The remote server returned HTTP 429")
+    end
+
     it "connects to the validated IP while keeping the URL host on the HTTP client" do
       response = Net::HTTPOK.new("1.1", "200", "OK")
       response.instance_variable_set(:@read, true)

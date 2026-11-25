@@ -70,7 +70,7 @@ class ChatRun < ApplicationRecord
       return false unless status_awaiting_tasks?
       return false if chat.running?
       tasks = chat.pending_tasks
-      return false if !explicit && tasks.any? && tasks.all?(&:input_required?)
+      return false if !explicit && tasks.any?(&:input_required?)
       # This only delivers intent; the worker reauthorizes before any provider
       # or tool work, including when the original actor has since lost access.
       update!(status: :running, resume_at: Time.current)

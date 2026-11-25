@@ -25,6 +25,12 @@ register an application-owned name in `ChatPurpose.registry`. See
 [named purposes](chat_purposes.md). `ChatStreamJob.perform(run_id)` reconstructs
 that purpose on every delivery; feature code does not belong in the job.
 
+Native purpose callbacks compose with the worker callbacks. Use the native
+`before_tool_call`, `around_tool_call`, and `after_message` declarations when a
+feature needs them; each business operation still enforces its own access. A
+persisted chat keeps its saved model during binding/resume; select it before
+starting work as described in [named purposes](chat_purposes.md#ownership-and-provider-choices).
+
 Feature agents can declare their tools directly. `ToolsetService` is the default
 assistant's toolset and the allowlist for database-backed worker selections.
 Add optional selectable tools to `additional_tool_classes`; do not give every

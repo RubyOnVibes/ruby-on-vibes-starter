@@ -139,6 +139,63 @@ RSpec.describe "Durable chat execution", type: :job do
     expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
   end
 
+  it "parks mixed task rounds for a person, then resumes background polling after their callback" do
+    executed, resumed = [], []
+    human_ready = work_ready = false
+    tool = Class.new(RubyLLM::Tool) do
+      description "Wait for background work or a signed document"
+      parameters do
+        string :mode
+      end
+      define_method(:initialize) { |**| }
+      define_method(:execute) do |mode:|
+        executed << mode
+        RubyLLM::Task.new(status: mode.to_sym, poll_interval: 1, data: { "mode" => mode })
+      end
+      define_method(:resume) do |task, **|
+        mode = task.data.fetch("mode")
+        resumed << mode
+        ready = mode == "input_required" ? human_ready : work_ready
+        ready ? "#{mode} completed" : task
+      end
+    end
+    stub_const("MixedWaitTool", tool)
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ MixedWaitTool ])
+    calls = %w[working input_required].map { |mode| tool_call(:mixed_wait, mode: mode) }
+    stub_replies calls.first, "Both operations completed."
+    allow_any_instance_of(RubyLLM::Providers::Anthropic).to receive(:complete).and_wrap_original do |original, *args, **kwargs, &block|
+      response = original.call(*args, **kwargs, &block)
+      response.tool_call? ? response.with_tool_calls(calls.index_by(&:id)) : response
+    end
+    run = new_run
+    ChatStreamJob.perform_now(run.id)
+    expect(Chat.find(chat.id).pending_tasks.map(&:status)).to match_array([ :working, :input_required ])
+    expect(run.reload).to be_status_awaiting_tasks
+    expect(run.resume_at).to be_nil
+
+    ChatStreamJob.perform_now(run.id) # A duplicate delivery cannot answer for the person.
+    ResumeChatRunsJob.perform_now
+    expect(resumed).to be_empty
+    expect(ChatStreamJob).not_to have_received(:perform_later)
+
+    human_ready = true # The authorized application callback verified the signed document.
+    expect(run.resume_tasks!(explicit: true)).to be true
+    ChatStreamJob.perform_now(run.id)
+    expect(run.reload).to be_status_awaiting_tasks
+    expect(run.resume_at).to be_present
+    expect(Chat.find(chat.id).pending_tasks.sole.status).to eq(:working)
+
+    work_ready = true
+    run.update!(resume_at: 1.second.ago)
+    expect(run.recover!).to be true
+    ChatStreamJob.perform_now(run.id)
+    expect(run.reload).to be_status_completed
+    expect(executed).to eq(%w[working input_required])
+    expect(resumed).to eq(%w[working input_required working])
+    expect(chat.messages.where(role: :user).count).to eq(1)
+    expect(chat.messages.where(role: :tool).count).to eq(2)
+  end
+
   it "preserves completed tool effects when cancelled" do
     stub_replies tool_call(Examples::RenameChatTool.tool_name, title: "Kept title"), "Done."
     allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ Examples::RenameChatTool ])

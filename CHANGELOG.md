@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased — Native task consolidation
+## Unreleased — RubyLLM documentation alignment
+
+- Keep mixed native task rounds parked when any task requires human input; resume background polling after the explicit callback resolves that wait.
+- Keep unexpected errors from default tools out of model-visible results and route them through the existing safe run failure handler.
+- Document native model-selection semantics for persisted chats, including explicit model selection before a reproducible evaluation run.
+- Explain claim-renewal connection capacity and independent conversations for independently approved business records.
+
+Validation: 490 passing specs, real queue delivery and crash-recovery probes, Zeitwerk, clean RuboCop, and no new Brakeman warnings. Providers are scripted; the comparative application benchmark has not been run.
+
+## 2026-11-25 — Native task consolidation
 
 - Remove the prototype application task runner, effects API, polling panel and synthetic conversation continuations. Native RubyLLM tasks are the only deferred-tool protocol.
 - Keep ordinary Rails jobs and domain operation records responsible for background work, business idempotency, cancellation and evidence. Add an opt-in approval-gated report-publication recipe.
