@@ -1,11 +1,16 @@
-# Async adapter works within the same process
-# ChatStreamJob uses async_job with Inline processor → runs in Falcon web process
-# This keeps ActionCable + streaming in sync (same process)
+# Shared by web and job processes. Uses the primary database by default, so
+# SQLite, PostgreSQL, and mounted installations keep the same database layout.
+# These short-lived events are delivery notifications; chat history lives in
+# messages/chat_runs and is reloaded when the browser reconnects.
 development:
-  adapter: async
+  adapter: solid_cable
+  polling_interval: 0.1.seconds
+  message_retention: 5.minutes
 
 test:
   adapter: test
 
 production:
-  adapter: async
+  adapter: solid_cable
+  polling_interval: 0.1.seconds
+  message_retention: 5.minutes

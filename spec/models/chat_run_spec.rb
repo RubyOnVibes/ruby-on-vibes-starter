@@ -199,7 +199,7 @@ RSpec.describe ChatRun, type: :model do
     end
 
     context 'when running with an assistant message' do
-      it 'clears the processing message content' do
+      it 'preserves the partial message content' do
         run = create_run!(status: :running)
 
         # Create an assistant message during this run
@@ -217,13 +217,13 @@ RSpec.describe ChatRun, type: :model do
         run.cancel!
 
         msg.reload
-        expect(msg.content).to eq("")
-        expect(msg.metadata['cancelled']).to be true
+        expect(msg.content).to eq("Partial response being streamed...")
+        expect(msg.skip_llm_context?).to be false
       end
     end
 
     context 'when running with orphaned tool calls' do
-      it 'destroys orphaned tool calls on the processing message' do
+      it 'preserves unfinished tool calls for native cancellation' do
         run = create_run!(status: :running)
 
         msg = chat.messages.create!(
@@ -243,7 +243,7 @@ RSpec.describe ChatRun, type: :model do
 
         run.cancel!
 
-        expect { tc.reload }.to raise_error(ActiveRecord::RecordNotFound)
+        expect(tc.reload.message).to eq(msg)
       end
     end
 

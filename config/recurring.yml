@@ -9,7 +9,15 @@
 #     priority: 2
 #     schedule: at 5am every day
 
+development:
+  resume_chat_runs:
+    class: ResumeChatRunsJob
+    schedule: every minute
+
 production:
+  resume_chat_runs:
+    class: ResumeChatRunsJob
+    schedule: every minute
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 7
@@ -21,7 +29,8 @@ production:
   # == Persistent Agent Scheduled Runs ==
   #
   # To schedule an agent, uncomment and set the agent ID.
-  # The job is idempotent — it skips inactive agents and missing IDs.
+  # Inactive agents and missing IDs are skipped. Use a business idempotency key
+  # in tools that perform external effects; recurring delivery may repeat.
   #
   # Find agent IDs: Agent.where(schedule: not_nil).pluck(:id, :identifier, :schedule)
   #

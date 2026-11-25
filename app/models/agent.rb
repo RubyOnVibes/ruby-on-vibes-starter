@@ -33,6 +33,7 @@ class Agent < ApplicationRecord
   validates :identifier, presence: true,
     uniqueness: { scope: :workspace_id },
     format: { with: /\A[a-z][a-z0-9_]*\z/, message: "must be lowercase with underscores" }
+  validate :tool_config_is_registered
 
   before_create :generate_webhook_token
 
@@ -77,9 +78,7 @@ class Agent < ApplicationRecord
   # Returns nil if no custom config (meaning: use defaults).
   #
   def configured_tool_classes
-    return nil if tool_config.blank?
-
-    tool_config.filter_map { |name| name.safe_constantize }
+    ToolsetService.resolve(tool_config)
   end
 
   ##
@@ -121,6 +120,12 @@ class Agent < ApplicationRecord
   end
 
   private
+
+  def tool_config_is_registered
+    configured_tool_classes
+  rescue ToolsetService::InvalidToolConfiguration => error
+    errors.add(:tool_config, error.message)
+  end
 
   def generate_webhook_token
     self.webhook_token ||= SecureRandom.hex(32)

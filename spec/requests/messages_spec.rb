@@ -66,11 +66,8 @@ RSpec.describe "Messages", type: :request do
         run = team_chat.chat_runs.last
         expect(run).to be_status_pending
 
-        expect(ChatStreamJob).to have_received(:perform_later).with(
-          team_chat.id,
-          team_chat.messages.last.id,
-          run.id
-        )
+        expect(run.input_message).to eq(team_chat.messages.last)
+        expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
       end
 
       it "returns message data in JSON response" do
@@ -176,22 +173,21 @@ RSpec.describe "Messages", type: :request do
       end
     end
 
-    context "stale run cleanup" do
+    context "durable run preservation" do
       before do
         allow(Turbo::StreamsChannel).to receive(:broadcast_append_to)
         allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
         allow(ChatStreamJob).to receive(:perform_later)
       end
 
-      it "expires stale active runs before creating new one" do
+      it "leaves interrupted runs for the recovery job" do
         stale_run = team_chat.chat_runs.create!(status: :running)
 
         post chat_messages_path(team_chat), params: { content: "Hello" }, as: :json
 
-        expect(response).to have_http_status(:ok)
-        stale_run.reload
-        expect(stale_run).to be_status_failed
-        expect(stale_run.failed_at).to be_present
+        expect(response).to have_http_status(:conflict)
+        expect(stale_run.reload).to be_status_running
+        expect(stale_run.failed_at).to be_nil
       end
     end
 

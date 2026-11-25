@@ -4,10 +4,13 @@ class Chat < ApplicationRecord
 
   acts_as_chat
 
+  validates :purpose, inclusion: { in: ->(_) { ChatPurpose.keys } }
+  validate :purpose_is_fixed_during_work
+
   # Filter messages before sending to LLM API.
   #
   # Excludes:
-  # - Messages marked skip_llm_context (from recover_from_tool_errors!)
+  # - Messages explicitly excluded from context
   # - Empty non-system messages from cancelled ChatRuns
   #
   # Preserves:
@@ -46,71 +49,6 @@ class Chat < ApplicationRecord
     order_messages_for_llm(super)
   end
   private :eager_load_messages
-
-  ##
-  # Recover from incomplete tool call chains left by crashed processes.
-  #
-  # When a process dies mid-tool-execution (server restart, OOM, deploy),
-  # no Ruby rescue runs and RubyLLM's cleanup_orphaned_tool_results never
-  # fires. This leaves partial tool chains in the DB:
-  #
-  #   [assistant: tool_use(A) + tool_use(B)]  ← expects 2 results
-  #   [tool: result_for_A]                     ← only 1 arrived
-  #
-  # The Anthropic API rejects incomplete chains. Without recovery, every
-  # subsequent message in the chat fails — the chat is permanently broken.
-  #
-  # This method marks broken chains as skip_llm_context: true (preserving
-  # them for audit trail) so the LLM never sees them.
-  #
-  # Common with async_job adapter where jobs run in-process and die with
-  # the server. Less common with SolidQueue/Sidekiq (separate workers).
-  #
-  def recover_from_tool_errors!
-    recovered = false
-
-    # Pass 1: Assistant messages with incomplete tool chains
-    self.messages.where(role: 'assistant', skip_llm_context: false)
-        .joins(:ruby_llm_tool_calls)
-        .distinct
-        .each do |assistant_msg|
-      tool_calls = assistant_msg.ruby_llm_tool_calls.includes(:result).to_a
-      result_messages = tool_calls.filter_map(&:result)
-      expected_count = tool_calls.size
-      actual_count = result_messages.size
-
-      next if actual_count == expected_count
-
-      assistant_msg.update_columns(skip_llm_context: true)
-      self.messages.where(id: result_messages.map(&:id)).update_all(skip_llm_context: true)
-
-      # Also mark the triggering user message
-      prev_msg = self.messages.where('id < ?', assistant_msg.id).order(id: :desc).first
-      if prev_msg && prev_msg.role == 'user'
-        prev_msg.update_columns(skip_llm_context: true)
-        Rails.logger.info "[Chat##{id}] Also marked triggering user message #{prev_msg.id} as skip_llm_context"
-      end
-
-      recovered = true
-      Rails.logger.warn "[Chat##{id}] Recovered incomplete tool chain: " \
-        "msg #{assistant_msg.id} (#{actual_count}/#{expected_count} results)"
-    end
-
-    # Pass 2: Orphaned tool result messages (parent tool call was destroyed,
-    # e.g. by ChatRun cancel cleanup).
-    orphaned = self.messages.where(role: 'tool', skip_llm_context: false)
-      .where.missing(:ruby_llm_parent_tool_call)
-    if orphaned.exists?
-      count = orphaned.update_all(skip_llm_context: true)
-      recovered = true
-      Rails.logger.warn "[Chat##{id}] Marked #{count} orphaned tool result messages as skip_llm_context"
-    end
-
-    # Pass 3: Tool messages whose parent assistant is filtered
-    cleanup_orphaned_tool_messages!
-
-    recovered
-  end
 
   belongs_to :member  # Creator/owner (for audit trail and permissions)
   has_many :messages, dependent: :destroy  # Cascade delete all messages when chat deleted
@@ -238,36 +176,9 @@ class Chat < ApplicationRecord
   
   private
   
-  ##
-  # Pass 3: Tool messages whose parent assistant message is filtered out.
-  #
-  # After Pass 1 marks an assistant message as skip_llm_context, its tool
-  # result messages may still be in the LLM context. The API sees tool_result
-  # without a matching tool_use → 400 error.
-  #
-  def cleanup_orphaned_tool_messages!
-    self.messages.where(role: 'tool', skip_llm_context: false).find_each do |tool_msg|
-      tool_call_record = tool_msg.ruby_llm_parent_tool_call
-      unless tool_call_record
-        tool_msg.update_column(:skip_llm_context, true)
-        Rails.logger.warn "[Chat##{id}] Tool message #{tool_msg.id} orphaned (tool call destroyed)."
-        next
-      end
-
-      parent_assistant = tool_call_record.message
-      next unless parent_assistant
-
-      # If parent assistant is filtered (skipped, or empty without tool_calls),
-      # this tool msg is orphaned. Assistant messages with tool_calls legitimately
-      # have empty content — that's normal, not filtered.
-      parent_filtered = parent_assistant.skip_llm_context? ||
-                        (parent_assistant.content.to_s.strip.empty? && !parent_assistant.ruby_llm_tool_calls.exists?)
-
-      if parent_filtered
-        Rails.logger.warn "[Chat##{id}] Tool message #{tool_msg.id} orphaned " \
-          "(parent assistant #{parent_assistant.id} is filtered). Marking as skip_llm_context."
-        tool_msg.update_column(:skip_llm_context, true)
-      end
+  def purpose_is_fixed_during_work
+    if persisted? && will_save_change_to_purpose? && (chat_runs.active.exists? || pending_tasks.any? || pending_questions.any?)
+      errors.add(:purpose, "cannot change while work is pending")
     end
   end
 

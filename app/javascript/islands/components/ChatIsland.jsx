@@ -29,85 +29,26 @@ export default function ChatIsland({ containerId }) {
   // --- Hooks ---
   const { messages, sendMessage, reconcileFromServer, clearMessages } = useTurboChat(chatId)
   const { activeRun, canStop, cancelRun, isAwaitingTasks } = useChatRunState(chatId)
-  const { tasks: agentTasks, hasActive: hasActiveTasks, cancelTask: cancelAgentTask, dismissTasks: dismissAgentTasks, refetch: refetchAgentTasks } = useAgentTasks(chatId)
+  const { tasks: agentTasks, cancelTask: cancelAgentTask, dismissTasks: dismissAgentTasks, refetch: refetchAgentTasks } = useAgentTasks(chatId)
   const previousRunRef = useRef(null)
-  const continuationTriggeredRef = useRef(false)
 
   // Reconcile messages and refresh agent tasks when a run completes
   useEffect(() => {
     if (previousRunRef.current && !activeRun) {
       reconcileFromServer()
       refetchAgentTasks() // Pick up any tasks created by tools during this run
-      continuationTriggeredRef.current = false // Reset for next cycle
     }
     previousRunRef.current = activeRun
   }, [activeRun, reconcileFromServer, refetchAgentTasks])
 
-  // When run enters awaiting_tasks, fetch tasks immediately so the panel
-  // appears and the continuation logic below has data to work with.
-  // Without this, useAgentTasks has no tasks (never polled) and continuation never fires.
+  // Refresh the optional business-task panel when a run waits. Durable server
+  // jobs own continuation; native RubyLLM tasks need not have AgentTask rows.
   useEffect(() => {
     if (isAwaitingTasks) {
       refetchAgentTasks()
     }
   }, [isAwaitingTasks, refetchAgentTasks])
 
-  // Auto-continuation: when awaiting_tasks and all agent tasks are terminal,
-  // trigger the backend to resume the chat run with task results.
-  // Skip if all tasks were cancelled (user doesn't need a summary of cancellations).
-  //
-  // IMPORTANT: Scope to tasks created during this run to avoid premature continuation
-  // from old completed tasks. Without this, the effect fires before the refetch resolves
-  // because stale agentTasks from prior runs already have completed items.
-  const runCreatedAt = activeRun?.createdAt ? new Date(activeRun.createdAt) : null
-  const tasksThisRun = runCreatedAt
-    ? agentTasks.filter(t => new Date(t.createdAt) >= runCreatedAt)
-    : agentTasks
-  const hasCompletedOrFailed = tasksThisRun.some(t => t.status === 'completed' || t.status === 'failed')
-  const allCancelled = tasksThisRun.length > 0 && !hasActiveTasks && tasksThisRun.every(t => t.status === 'cancelled')
-
-  useEffect(() => {
-    if (!isAwaitingTasks || hasActiveTasks || continuationTriggeredRef.current) return
-
-    // If all tasks were cancelled, just complete the run (no summary needed).
-    // If some completed/failed, trigger continuation for the assistant to summarize.
-    if (allCancelled) {
-      continuationTriggeredRef.current = true
-      const completeRun = async () => {
-        try {
-          const token = document.querySelector('meta[name="csrf-token"]')?.content || ''
-          await fetch(`/chat_runs/${activeRun.id}/cancel`, {
-            method: 'POST',
-            headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' }
-          })
-        } catch (err) {
-          console.error('[ChatIsland] Complete-after-cancel error:', err)
-          continuationTriggeredRef.current = false
-        }
-      }
-      completeRun()
-    } else if (hasCompletedOrFailed) {
-      continuationTriggeredRef.current = true
-      const triggerContinuation = async () => {
-        try {
-          const token = document.querySelector('meta[name="csrf-token"]')?.content || ''
-          const response = await fetch(`/chat_runs/${activeRun.id}/continue`, {
-            method: 'POST',
-            headers: { 'X-CSRF-Token': token, 'Accept': 'application/json' }
-          })
-
-          if (!response.ok) {
-            console.error('[ChatIsland] Continuation failed:', response.status)
-            continuationTriggeredRef.current = false
-          }
-        } catch (err) {
-          console.error('[ChatIsland] Continuation error:', err)
-          continuationTriggeredRef.current = false
-        }
-      }
-      triggerContinuation()
-    }
-  }, [isAwaitingTasks, hasActiveTasks, hasCompletedOrFailed, allCancelled, activeRun])
   const { members: chatMembers, removeMember, refetch: refetchMembers } = useChatMembers(chatId)
   const { members: orgMembers } = useWorkspaceMembers()
   const { results: mentionResults, isLoading: mentionsLoading, search: searchMentions, clear: clearMentions } = useMentionSearch({ chatId })

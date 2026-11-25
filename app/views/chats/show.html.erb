@@ -262,6 +262,9 @@
   <div class="flex-1 flex flex-col min-w-0 w-full" style="background-color: var(--color-background);">
     <% if @chat.present? %>
     <%= turbo_stream_from "chat_#{@chat.id}" %>
+    <div class="flex justify-end px-4 py-2 border-b border-border">
+      <%= link_to "Files and artifacts", chat_files_path(@chat), class: "text-sm text-muted-foreground hover:text-foreground" %>
+    </div>
     
     <div id="chat-run-state-container" style="display: none;" aria-hidden="true">
       <% if @active_chat_run.present? %>

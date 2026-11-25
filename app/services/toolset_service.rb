@@ -15,7 +15,7 @@
 #
 # To add a new tool:
 #   1. Create your tool class in app/tools/ (subclass RubyLLM::Tool)
-#   2. Add it to the #tool_classes array below
+#   2. Add it to .default_tool_classes or .additional_tool_classes below
 #   3. If it triggers a background task, also create a job in app/jobs/ (subclass AgentTaskJob)
 #
 # See docs/building_with_agents.md for the full guide.
@@ -32,28 +32,41 @@ class ToolsetService
     @sender_workspace = sender_workspace
   end
 
-  # Configure the list of tool classes to instantiate.
-  # Add your custom tools here - they'll be available to the LLM in chat.
-  #
-  # If the chat belongs to an Agent with custom tool_config, those tool classes
-  # are used instead of the defaults (agent task management tools are always included).
+  # nil means the application's defaults; [] means no application tools.
+  # An explicit selection never silently regains task-management capabilities.
   def tool_classes
-    # Check for agent-specific tool config
-    if @chat && (agent = @chat.agent)&.configured_tool_classes
-      tools = agent.configured_tool_classes
+    configured = @chat&.agent&.configured_tool_classes
+    configured.nil? ? self.class.default_tool_classes : configured
+  end
 
-      # Always include agent task management tools
-      if RubyOnVibes.agent_tasks?
-        tools.push(
-          AgentTaskStatusTool,
-          CancelAgentTaskTool,
-          ListAgentTasksTool
-        )
-      end
+  class InvalidToolConfiguration < ArgumentError; end
 
-      return tools.uniq
+  # Register additional classes here when they may be selected by persisted
+  # Agents but should not be enabled for every default chat. Request/database
+  # strings are looked up in this code-owned allowlist, never constantized.
+  def self.additional_tool_classes
+    []
+  end
+
+  def self.registry
+    (default_tool_classes + additional_tool_classes).uniq.index_by(&:name)
+  end
+
+  def self.resolve(names)
+    return nil if names.nil?
+    unless names.is_a?(Array) && names.all? { |name| name.is_a?(String) }
+      raise InvalidToolConfiguration, "Tool configuration must be an array of registered names"
     end
 
+    allowed = registry
+    names.uniq.map do |name|
+      allowed.fetch(name) { raise InvalidToolConfiguration, "Tool is not registered or enabled: #{name}" }
+    end
+  end
+
+  # Add application-wide tools here. Feature gates also constrain the registry
+  # so a persisted Agent cannot bypass disabled reference/task capabilities.
+  def self.default_tool_classes
     tools = [
       CurrentDateTimeTool,      # Returns current date/time in user's timezone
       RandomNumberTool,         # Generates true random numbers (no network needed)

@@ -1,0 +1,37 @@
+<% content_for :title, "Files · #{@chat.name}" %>
+
+<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+  <%= link_to "← Back to chat", chat_path(@chat), class: "text-sm text-muted-foreground hover:text-foreground" %>
+  <div class="mt-6 mb-8">
+    <h1 class="text-2xl font-semibold text-foreground">Chat files</h1>
+    <p class="mt-2 text-muted-foreground">Source documents and assistant outputs for <%= @chat.name %>. Everyone in this chat can access these files.</p>
+  </div>
+
+  <%= form_with url: chat_files_path(@chat), multipart: true, class: "rounded-xl border border-border bg-surface-1 p-5 mb-8" do |form| %>
+    <%= form.label :file, "Add a source document", class: "block font-medium text-foreground mb-2" %>
+    <%= form.file_field :file, required: true, accept: ChatFileLibrary::UPLOAD_TYPES.keys.join(","), class: "block w-full text-sm text-foreground" %>
+    <p class="mt-2 text-sm text-muted-foreground">PDF, text, Markdown, CSV, JSON, or images. Up to 25 MB each.</p>
+    <%= form.submit "Upload file", class: "mt-4 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground cursor-pointer" %>
+  <% end %>
+
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-foreground">Documents and artifacts</h2>
+    <%= link_to "Refresh", chat_files_path(@chat), class: "text-sm text-muted-foreground hover:text-foreground" %>
+  </div>
+  <% if @files.any? %>
+    <ul class="divide-y divide-border rounded-xl border border-border bg-surface-1">
+      <% @files.each do |file| %>
+        <li class="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-foreground break-words"><%= File.basename(file.path) %></p>
+            <p class="mt-1 text-xs text-muted-foreground break-all"><%= file.path %></p>
+            <p class="mt-1 text-xs text-muted-foreground"><%= number_to_human_size(file.byte_size) %> · <%= file.updated_at.to_fs(:short) %></p>
+          </div>
+          <%= link_to "Download", chat_file_path(@chat, file), class: "rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface-2", data: { turbo: false } %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground">Add a document above, or ask your assistant to create a file.</p>
+  <% end %>
+</div>

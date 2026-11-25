@@ -1977,7 +1977,7 @@
     "isDynamicEntry": true
   },
   "../../node_modules/streamdown/dist/highlighted-body-B3W2YXNL.js": {
-    "file": "assets/highlighted-body-B3W2YXNL-CFvoKWUP.js",
+    "file": "assets/highlighted-body-B3W2YXNL-Dfzl2DUL.js",
     "name": "highlighted-body-B3W2YXNL",
     "src": "../../node_modules/streamdown/dist/highlighted-body-B3W2YXNL.js",
     "isDynamicEntry": true,
@@ -1987,7 +1987,7 @@
     ]
   },
   "../../node_modules/streamdown/dist/mermaid-3ZIDBTTL.js": {
-    "file": "assets/mermaid-3ZIDBTTL-P2H5PXZ3.js",
+    "file": "assets/mermaid-3ZIDBTTL-CnP5VUgF.js",
     "name": "mermaid-3ZIDBTTL",
     "src": "../../node_modules/streamdown/dist/mermaid-3ZIDBTTL.js",
     "isDynamicEntry": true,
@@ -2203,7 +2203,7 @@
     ]
   },
   "entrypoints/islands.js": {
-    "file": "assets/islands-BVglUuqm.js",
+    "file": "assets/islands-EeepRo7m.js",
     "name": "entrypoints/islands.js",
     "src": "entrypoints/islands.js",
     "isEntry": true,

@@ -25,6 +25,8 @@ class ChatRun < ApplicationRecord
   class ToolCallAlreadyDecided < StandardError; end
 
   belongs_to :chat
+  belongs_to :input_message, class_name: "Message", optional: true
+  validate :input_message_belongs_to_chat
   belongs_to :initiated_by_member, class_name: "Member", optional: true
   has_many :owned_llm_usages, class_name: "RubyLLM::ActiveRecord::Usage", as: :owner, dependent: :nullify
 
@@ -52,6 +54,65 @@ class ChatRun < ApplicationRecord
 
   def active?
     status_pending? || status_running? || status_awaiting_tasks? || status_awaiting_approval?
+  end
+
+  # The persisted intent is the outbox. If enqueueing or a worker dies, the
+  # recurring recovery job can redeliver it without reconstructing a browser request.
+  def dispatch!(wait: 0, options: {})
+    with_lock do
+      return false unless active?
+      update!(execution_options: execution_options.merge(options.stringify_keys), resume_at: Time.current + wait)
+    end
+    if wait.positive?
+      ChatStreamJob.set(wait_until: resume_at).perform_later(id)
+    else
+      ChatStreamJob.perform_later(id)
+    end
+    true
+  end
+
+  def execution_member!
+    actor = initiated_by_member
+    raise Pundit::NotAuthorizedError, "The initiating member no longer has access" unless actor && chat.member_exists?(actor)
+    actor
+  end
+
+  def business_tasks
+    chat.agent_tasks.where("created_at >= ?", created_at).where.not(kind: %w[scheduled_run webhook_run])
+  end
+
+  # Native tasks retain their own resumable state. Legacy application tasks
+  # still receive one synthetic turn, persisted before dispatch so retries do
+  # not add another. Neither path needs a browser to remain open.
+  def resume_tasks!(explicit: false)
+    with_lock do
+      return false unless status_awaiting_tasks?
+      tasks = chat.pending_tasks
+      if tasks.any?
+        return false if !explicit && tasks.all?(&:input_required?)
+      else
+        return false if business_tasks.active.exists?
+        depth = execution_options.fetch("continuation_depth", 0).to_i + 1
+        if depth > ENV.fetch("MAX_CONTINUATION_DEPTH", 5).to_i
+          update!(status: :failed)
+          return false
+        end
+        self.input_message = chat.messages.create!(role: :user,
+          content: "My background tasks have finished. Please check their results.", user_submitted: false)
+        self.execution_options = execution_options.merge("task_continuation" => true, "continuation_depth" => depth)
+      end
+      update!(status: :running, resume_at: Time.current)
+    end
+    dispatch!
+  end
+
+  def recover!
+    return false unless active?
+    return false if chat.running?
+    return false if resume_at&.future?
+    return resume_tasks! if status_awaiting_tasks?
+    return false if status_awaiting_approval?
+    dispatch!
   end
 
   def transition_to_awaiting_tasks!
@@ -104,7 +165,7 @@ class ChatRun < ApplicationRecord
       )
 
       if pending_questions.empty?
-        update!(status: :running)
+        update!(status: :running, resume_at: Time.current, execution_options: execution_options.merge("approval_resume" => true))
         should_resume = true
       end
     end
@@ -217,36 +278,9 @@ class ChatRun < ApplicationRecord
       # stopping means "stop everything."
       chat.agent_tasks.active.find_each(&:cancel!)
 
-      # Find the most recent assistant message created during this run
-      # This should be the message currently being streamed
-      #
-      processing_message = chat.messages
-        .where(role: :assistant)
-        .where('created_at >= ?', created_at)
-        .order(created_at: :desc)
-        .first
-      
-      if processing_message
-        processing_message.update!(
-          content: "",  # Empty content - UI shows "Cancelled"
-          skip_llm_context: true,  # Never include cancelled messages in LLM context
-          metadata: (processing_message.metadata || {}).merge(cancelled: true)
-        )
-        
-        # Clean up orphaned tool calls to prevent RubyLLM validation errors
-        # When we cancel mid-tool-execution, RubyLLM expects tool result messages
-        # but we skip them, so we must clean up the tool_calls entirely
-        orphaned_tool_calls = processing_message.ruby_llm_tool_calls
-        if orphaned_tool_calls.any?
-          Rails.logger.info "[ChatRun] Deleting #{orphaned_tool_calls.count} orphaned tool calls"
+      # RubyLLM closes unfinished calls and preserves completed effects. Keep
+      # messages and tool results as the durable record of what actually ran.
 
-          # Delete tool result messages before their tool-call records.
-          orphaned_tool_calls.includes(:result).filter_map(&:result).each(&:destroy!)
-          orphaned_tool_calls.destroy_all
-        end
-        
-        processing_message.broadcast_full_replace!
-      end
     end
 
     true
@@ -254,6 +288,10 @@ class ChatRun < ApplicationRecord
 
   private
   
+  def input_message_belongs_to_chat
+    errors.add(:input_message, "must belong to this chat") if input_message && input_message.chat_id != chat_id
+  end
+
   def set_node_name
     self.node_name = current_node_name
   end

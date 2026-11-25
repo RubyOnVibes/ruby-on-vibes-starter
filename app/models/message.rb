@@ -196,7 +196,7 @@ class Message < ApplicationRecord
   # understands what records the user explicitly referenced.
   #
   # NOTE: Sender identity is provided via the <environment> block in
-  # system instructions (see ChatStreamJob#build_environment_context).
+  # system instructions (see ChatAgentContext).
   # We don't prefix messages here to avoid confusion with @mentions.
   #
   # NOTE: Attachments are included automatically by RubyLLM's to_llm via extract_content.
@@ -206,7 +206,7 @@ class Message < ApplicationRecord
 
     # Only enrich user messages that have @mentions
     if role == 'user' && mentions.any?
-      llm_message.content = resolve_mentions_for_llm(llm_message.content)
+      llm_message = llm_message.with(content: resolve_mentions_for_llm(llm_message.content))
     end
 
     llm_message

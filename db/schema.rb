@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_005607) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_120001) do
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -259,10 +259,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_005607) do
     t.integer "thinking_tokens"
     t.decimal "total_cost", precision: 16, scale: 10
     t.json "usage_metadata", default: {}, null: false
+    t.integer "input_message_id"
+    t.json "execution_options", default: {}, null: false
+    t.datetime "resume_at"
+    t.string "trigger", default: "user", null: false
     t.index ["chat_id", "status"], name: "index_chat_runs_on_chat_id_and_status"
     t.index ["chat_id"], name: "index_chat_runs_on_chat_active", unique: true, where: "status IN (0, 1, 5, 6)"
     t.index ["chat_id"], name: "index_chat_runs_on_chat_id"
     t.index ["initiated_by_member_id"], name: "index_chat_runs_on_initiated_by_member_id"
+    t.index ["input_message_id"], name: "index_chat_runs_on_input_message_id"
+    t.index ["status", "resume_at"], name: "index_chat_runs_on_status_and_resume_at"
     t.index ["status"], name: "index_chat_runs_on_status"
   end
 
@@ -282,6 +288,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_005607) do
     t.boolean "cancelled", default: false, null: false
     t.string "claim_token"
     t.datetime "claimed_until"
+    t.string "purpose", default: "assistant", null: false
     t.index ["claimed_until"], name: "index_chats_on_claimed_until", where: "claim_token IS NOT NULL"
     t.index ["has_multiple_members"], name: "index_chats_on_has_multiple_members"
     t.index ["member_id"], name: "index_chats_on_member_id"
@@ -698,6 +705,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_005607) do
     t.check_constraint "status IN ('pending', 'succeeded', 'failed', 'cancelled')"
   end
 
+  create_table "solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", limit: 1024, null: false
+    t.binary "payload", limit: 536870912, null: false
+    t.datetime "created_at", null: false
+    t.integer "channel_hash", limit: 8, null: false
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
+  end
+
   create_table "users", force: :cascade do |t|
     t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
@@ -759,6 +775,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_005607) do
   add_foreign_key "chat_members", "members"
   add_foreign_key "chat_runs", "chats"
   add_foreign_key "chat_runs", "members", column: "initiated_by_member_id"
+  add_foreign_key "chat_runs", "messages", column: "input_message_id"
   add_foreign_key "chats", "members"
   add_foreign_key "chats", "ruby_llm_models"
   add_foreign_key "chats", "users"

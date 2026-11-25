@@ -18,41 +18,13 @@ class AgentScheduledRunJob < SolidQueueJob
     chat = agent.chat
     member = agent.member
 
-    # Auto-compact before run to keep agent within context limits (best-effort).
-    # Future: gate this on a token-count check so we only compact when actually
-    # near the model's window — currently compact_if_needed! decides internally.
-    begin
-      Chat::CompactionService.new(chat).compact_if_needed!
-    rescue => e
-      Rails.logger.error "[AgentScheduledRunJob] Compaction failed, continuing: #{e.class} - #{e.message}"
+    chat.with_lock do
+      return if chat.chat_runs.active.exists? || chat.running?
+      trigger_message = chat.messages.create!(role: :user,
+        content: "Scheduled run: #{Time.current.iso8601}", user_submitted: false)
+      @run = chat.chat_runs.create!(status: :pending, initiated_by_member: member,
+        input_message: trigger_message, trigger: "schedule")
     end
-
-    # Create a trigger message in the agent's chat
-    trigger_message = chat.messages.create!(
-      role: :user,
-      content: "Scheduled run: #{Time.current.strftime('%b %d, %Y %l:%M%P').strip}",
-      user_submitted: false
-    )
-
-    # Create an AgentTask for tracking
-    task = AgentTask.create!(
-      chat: chat,
-      workspace: agent.workspace,
-      member: member,
-      kind: "scheduled_run",
-      trigger: "schedule"
-    )
-
-    # Create a ChatRun and trigger the chat stream (same path as user messages)
-    chat_run = chat.chat_runs.create!(status: :pending, initiated_by_member: member)
-
-    ChatStreamJob.perform_later(
-      chat.id,
-      trigger_message.id,
-      chat_run.id,
-      { sender_member_id: member.id, sender_user_id: member.user_id }
-    )
-
-    Rails.logger.info "[AgentScheduledRunJob] Triggered scheduled run for agent '#{agent.identifier}' (task: #{task.to_param})"
+    @run.dispatch!
   end
 end

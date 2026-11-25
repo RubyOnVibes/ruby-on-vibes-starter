@@ -38,12 +38,12 @@ RSpec.describe AgentWebhookRunJob, type: :job do
     allow(ChatStreamJob).to receive(:perform_later)
   end
 
-  it 'starts the agent task' do
+  it 'acknowledges webhook delivery and links the durable run' do
     described_class.new.perform(agent.id, task.id)
 
     task.reload
-    expect(task.status).to eq("running")
-    expect(task.started_at).to be_present
+    expect(task.status).to eq("completed")
+    expect(task.result["chat_run_id"]).to eq(agent.chat.chat_runs.last.id)
   end
 
   it 'creates a ChatRun' do
@@ -55,14 +55,9 @@ RSpec.describe AgentWebhookRunJob, type: :job do
   it 'enqueues a ChatStreamJob with correct args' do
     described_class.new.perform(agent.id, task.id)
 
-    trigger_message_id = task.metadata["trigger_message_id"]
-
-    expect(ChatStreamJob).to have_received(:perform_later).with(
-      agent.chat.id,
-      trigger_message_id,
-      anything,
-      hash_including(sender_member_id: member.id, sender_user_id: member.user_id)
-    )
+    run = agent.chat.chat_runs.last
+    expect(run.input_message_id).to eq(task.metadata["trigger_message_id"])
+    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
   end
 
   it 'skips inactive agents' do

@@ -26,23 +26,10 @@ class ChatRunsController < ApplicationController
       return
     end
 
-    # Count assistant messages created during this run to track continuation depth.
-    # Prevents infinite loops if the LLM keeps creating tasks during continuations.
-    depth = @chat_run.chat.messages.where(role: :assistant)
-      .where("created_at >= ?", @chat_run.created_at).count
-
-    @chat_run.update!(status: :running)
-
-    # Trigger a continuation ChatStreamJob
-    # Pass nil for user_msg_id — continuation mode has no triggering user message
-    # Pass sender context so the job knows who to attribute the response to
-    ChatStreamJob.perform_later(
-      @chat_run.chat_id, nil, @chat_run.id,
-      sender_member_id: (@chat_run.initiated_by_member_id || current_member.id),
-      sender_user_id: (@chat_run.initiated_by_member&.user_id || current_user.id),
-      task_continuation: true,
-      continuation_depth: depth
-    )
+    unless @chat_run.resume_tasks!(explicit: true)
+      render json: { error: "Tasks are still running" }, status: :conflict
+      return
+    end
 
     render json: { status: 'continuing' }, status: :ok
   end
@@ -85,17 +72,7 @@ class ChatRunsController < ApplicationController
 
     tool_call.message.broadcast_upsert_to_chat! if tool_call.message.respond_to?(:broadcast_upsert_to_chat!)
 
-    if should_resume
-      initiator = @chat_run.initiated_by_member || current_member
-      ChatStreamJob.perform_later(
-        @chat_run.chat_id,
-        nil,
-        @chat_run.id,
-        sender_member_id: initiator.id,
-        sender_user_id: initiator.user_id,
-        approval_resume: true
-      )
-    end
+    @chat_run.dispatch! if should_resume
 
     render json: {
       status: decision,

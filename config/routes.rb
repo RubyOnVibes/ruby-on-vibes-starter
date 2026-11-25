@@ -43,6 +43,7 @@ Rails.application.routes.draw do
     end
     
     resources :messages, only: [:create]
+    resources :files, only: [:index, :create, :show], controller: "chat_files"
     resources :members, only: [:index, :destroy], controller: 'chats/members'
   end
   

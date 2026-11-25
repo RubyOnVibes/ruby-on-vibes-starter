@@ -42,16 +42,9 @@ RSpec.describe "ChatRun tool approvals", type: :request do
     expect(response.parsed_body).to include("status" => "approved", "resuming" => true)
     expect(call.reload.approval).to eq("approved")
     expect(run.reload).to be_status_running
-    expect(ChatStreamJob).to have_received(:perform_later).with(
-      chat.id,
-      nil,
-      run.id,
-      hash_including(
-        sender_member_id: member.id,
-        sender_user_id: user.id,
-        approval_resume: true
-      )
-    )
+    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
+    expect(run.initiated_by_member).to eq(member)
+    expect(run.execution_options).to include("approval_resume" => true)
   end
 
   it "denies the tool without executing it, then resumes the model" do

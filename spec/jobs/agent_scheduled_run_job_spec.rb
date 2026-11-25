@@ -34,30 +34,19 @@ RSpec.describe AgentScheduledRunJob, type: :job do
     expect(msg.user_submitted).to be false
   end
 
-  it 'creates an AgentTask with trigger: schedule' do
-    expect {
-      described_class.new.perform(agent.id)
-    }.to change { AgentTask.count }.by(1)
-
-    task = AgentTask.last
-    expect(task.chat).to eq(agent.chat)
-    expect(task.workspace).to eq(workspace)
-    expect(task.member).to eq(member)
-    expect(task.kind).to eq("scheduled_run")
-    expect(task.trigger).to eq("schedule")
+  it 'uses the durable run itself for schedule tracking' do
+    expect { described_class.new.perform(agent.id) }.not_to change(AgentTask, :count)
+    run = agent.chat.chat_runs.last
+    expect(run.trigger).to eq("schedule")
+    expect(run.initiated_by_member).to eq(member)
+    expect(run.input_message.content).to include("Scheduled run:")
+    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
   end
 
-  it 'enqueues a ChatStreamJob' do
+  it 'does not create another turn while the first is active' do
     described_class.new.perform(agent.id)
-
-    trigger_message = agent.chat.messages.order(:id).last
-
-    expect(ChatStreamJob).to have_received(:perform_later).with(
-      agent.chat.id,
-      trigger_message.id,
-      anything,
-      hash_including(sender_member_id: member.id, sender_user_id: member.user_id)
-    )
+    expect { described_class.new.perform(agent.id) }.not_to change(Message, :count)
+    expect(agent.chat.chat_runs.count).to eq(1)
   end
 
   it 'skips inactive agents' do

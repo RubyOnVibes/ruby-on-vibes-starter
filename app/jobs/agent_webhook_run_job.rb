@@ -13,34 +13,19 @@ class AgentWebhookRunJob < SolidQueueJob
     task = AgentTask.find_by(id: agent_task_id)
     return unless agent&.active?
     return if task.nil? || task.terminal?
+    return unless task.chat_id == agent.chat_id
 
-    task.start!
     chat = agent.chat
-    member = agent.member
-
-    # Auto-compact before run to keep agent within context limits (best-effort)
-    begin
-      Chat::CompactionService.new(chat).compact_if_needed!
-    rescue => e
-      Rails.logger.error "[AgentWebhookRunJob] Compaction failed, continuing: #{e.class} - #{e.message}"
+    chat.with_lock do
+      return if chat.chat_runs.active.exists? || chat.running?
+      return if task.reload.terminal?
+      trigger_id = task.metadata["trigger_message_id"]
+      message = trigger_id ? chat.messages.find(trigger_id) : chat.messages.where(role: :user, user_submitted: false).order(:id).last
+      @run = chat.chat_runs.create!(status: :pending, initiated_by_member: agent.member,
+        input_message: message, trigger: "webhook")
+      # This record tracks webhook receipt/delivery, not the conversation's work.
+      task.complete!({ "chat_run_id" => @run.id })
     end
-
-    # Create a ChatRun and trigger the chat stream
-    chat_run = chat.chat_runs.create!(status: :pending, initiated_by_member: member)
-    trigger_message_id = task.metadata["trigger_message_id"] || task.metadata[:trigger_message_id]
-    trigger_message_id ||= chat.messages
-      .where(role: :user, user_submitted: false)
-      .where(created_at: ..task.created_at)
-      .order(:id)
-      .last&.id
-
-    ChatStreamJob.perform_later(
-      chat.id,
-      trigger_message_id,
-      chat_run.id,
-      { sender_member_id: member.id, sender_user_id: member.user_id }
-    )
-
-    Rails.logger.info "[AgentWebhookRunJob] Triggered webhook run for agent '#{agent.identifier}' (task: #{task.to_param})"
+    @run.dispatch!
   end
 end

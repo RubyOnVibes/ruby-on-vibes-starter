@@ -67,7 +67,20 @@ RSpec.describe Message, type: :model do
       end
     end
 
-    # TODO: add mentionable tests
+    it 'enriches mentions using the native message API without losing attachments' do
+      message = messages(:alice_message)
+      member = members(:alice_personal_member)
+      message.update!(content: "Ask <@#{member.to_param}> about this file")
+      message.mentions.create!(mentionable: member)
+      message.attachments.attach(io: StringIO.new("Document text"), filename: "document.txt", content_type: "text/plain")
+
+      llm_message = message.to_llm
+
+      expect(llm_message.content).to include("@#{member.mentionable_label}", "about this file")
+      expect(llm_message.content).not_to include("<@")
+      expect(llm_message.attachments.size).to eq(1)
+      expect(message.reload.content).to include("<@#{member.to_param}>")
+    end
   end
 end
 
