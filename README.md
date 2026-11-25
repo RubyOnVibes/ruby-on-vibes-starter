@@ -17,7 +17,7 @@ Rails app
 
 An opinionated, AI-enhanced Rails 8 template for building agentic web applications. Chat with an AI assistant that can look things up, run background tasks autonomously, track its work, and report back — all on production-ready infrastructure.
 
-Built on Falcon (async fiber-based web server), SolidQueue (background jobs), RubyLLM 2.2 (multi-provider AI), and ERB/Turbo with React islands and Inertia pages.
+Built on Ruby 4.0.10, Rails 8.1.4.1, RubyLLM 2.2.3, Falcon, Solid Queue, and Solid Cable, with ERB/Turbo, React islands, and Inertia pages.
 
 ## Community
 
@@ -31,8 +31,8 @@ git clone <your-fork-url>
 cd <your-app>
 cp .env.example .env
 # Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env before starting the app.
-bin/setup        # bundle, db:prepare, JS deps
-bin/dev          # Falcon + SolidQueue + Vite + Tailwind
+bin/setup --skip-server  # bundle, db:prepare, JS deps
+bin/dev                 # Falcon + Solid Queue + Vite + Tailwind
 ```
 
 Open http://localhost:3000.
@@ -52,19 +52,21 @@ take effect when the application restarts.
 
 ## Architecture
 
-- **Fiber-based chat**: `ChatStreamJob` runs as an in-process fiber via `async-job`. LLM streaming, tool calls, and HTTP requests all yield during I/O — no thread starvation, no blocked workers.
+- **Durable chat**: Solid Queue runs conversations outside the web process. Native RubyLLM claims and tasks preserve interrupted work, and Solid Cable streams worker updates to the browser.
+- **Named purposes**: Trusted `ApplicationAgent` classes define tools and instructions for each chat purpose.
+- **Files and artifacts**: Native RubyLLM file stores use Active Storage, with authenticated chat-scoped uploads and downloads.
 - **Background agent tasks**: Long-running work runs in SolidQueue as a separate process. Progress tracking, retries, cancellation, and audit trails built in.
 - **Human decisions**: RubyLLM tools can pause for approval or a question. The chat UI supports approvals, typed form fields, and URL requests with workspace authorization.
-- **Run accounting**: Every provider attempt, token bucket, cache hit, and defensible cost is attributed to its ChatRun.
+- **Run accounting**: Calls inside the chat job are attributed to its ChatRun. Other services establish usage ownership explicitly with `RubyLLM.with_owner`.
 - **Multi-tenant**: Workspaces, members, roles, and permissions from day one.
 - **Direct provider access**: Anthropic and OpenAI keys work without the hosted platform. Other RubyLLM providers need explicit configuration and application checks.
 
 ## Using RubyLLM
 
-Start with [Building with Agents](docs/building_with_agents.md) for a structured
+Start with [Agent foundations](docs/agent-foundations.md) for durable execution, purposes, and files, then [Building with Agents](docs/building_with_agents.md) for a structured
 output example, the native `ApplicationAgent` base, tools, background tasks,
 provider-free integration tests, and an opt-in evaluation with deterministic
-checks. Library capabilities such as MCP, skills, file stores, and sandboxed
+checks. Additional capabilities such as MCP, skills, and sandboxed
 code execution are available to configure; they are not all enabled in the
 starter's chat UI by installing the gem.
 
@@ -91,7 +93,7 @@ How to add AI-powered capabilities using tools and agent tasks.
 
 - Native RubyLLM agents, structured output, test helpers, and evaluations
 - Tools vs Agent Tasks — when to use each
-- Creating inline tools (fast, run in the chat fiber)
+- Creating inline tools (short operations inside the durable chat job)
 - Creating agent tasks (background, long-running, with retries and progress)
 - Effect tracking for audit trails
 - Decision guide and file conventions
@@ -167,6 +169,18 @@ Several gems and features are optional and can be removed or disabled:
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Maintaining the starter
+
+`main` is the official reusable starter. Feature and demo branches remain separate
+until their shared changes are reviewed and merged. The document-intake demo is
+on `codex/document-intake-demo`, not part of the default application.
+
+For maintainers who also have the Ruby on Vibes platform checkout, the starter
+is the source for `spec/templates/0_1_0/`. From that checkout, use
+`script/sync-from-public-template --check` to check parity and
+`script/sync-from-public-template --apply` to copy a committed, clean starter
+`main`. Syncing source does not deploy or validate the platform runtime.
 
 ## Upgrades
 

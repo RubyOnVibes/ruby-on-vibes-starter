@@ -43,7 +43,7 @@ This app ships with AI-native infrastructure. These systems are dormant until us
 
 - **Rails 8.1**, Ruby 4.0.10, Vite for JS, Propshaft for assets
 - **Falcon** web server with **Solid Queue** for durable agent jobs and **Solid Cable** for shared streaming broadcasts
-- **SolidQueue** for most background jobs, async adapter for IO-heavy LLM work
+- **Solid Queue** for durable application and LLM jobs; use native tasks for long work
 - **SQLite** (development) or **PostgreSQL** (production)
 
 **Agent mindset**: Production Rails on constrained hardware. Prefer simple, robust changes over cleverness.
@@ -70,7 +70,7 @@ api_key = ENV.fetch('OPENAI_API_KEY')
 api_key = Rails.application.credentials.dig(:openai, :api_key)
 ```
 
-Instruct users to set secrets via the **Secrets menu** (lock icon in UI).
+Use an uncommitted local `.env` or deployment environment variables. The hosted platform also provides a **Secrets menu**.
 
 ---
 
