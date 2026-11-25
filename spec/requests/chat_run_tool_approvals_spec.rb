@@ -23,6 +23,7 @@ RSpec.describe "ChatRun tool approvals", type: :request do
     call = message.ruby_llm_tool_calls.create!(
       tool_call_id: "approval_request_#{suffix}",
       name: "examples__rename_chat",
+      approval: "pending",
       arguments: { title: "New title" },
       metadata: {
         requires_approval: true,

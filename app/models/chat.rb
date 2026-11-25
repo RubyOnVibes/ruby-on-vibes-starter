@@ -15,18 +15,22 @@ class Chat < ApplicationRecord
   #
   # Excludes:
   # - Messages explicitly excluded from context
-  # - Empty non-system messages from cancelled ChatRuns
+  # - Empty placeholders with no native replay state
   #
   # Preserves:
   # - Assistant messages with tool_calls (even if text content is blank)
   # - Tool result messages (orphaning them causes API errors)
+  # - Native provider state, reasoning and attachments even without visible text
   def order_messages_for_llm(messages)
     filtered = messages.reject do |msg|
       next true if msg.skip_llm_context?
       next true if msg.compacted?
       next false if msg.role.to_s == "system"
       next false if msg.content.present?
-      next false if msg.role.to_s == "user" && msg.attachments.attached?
+      next false if msg.llm_replay_payload?
+      # Native terminal answers can be empty (for example, a filtered reply).
+      # A finish marker or recorded input distinguishes them from placeholders.
+      next false if msg.role.to_s == "assistant" && (msg.finish_reason.present? || !msg.tokens.input.nil?)
       next false if msg.role.to_s == "tool"
       next false if msg.role.to_s == "assistant" && msg.ruby_llm_tool_calls.exists?
       true
@@ -35,8 +39,8 @@ class Chat < ApplicationRecord
     filtered
   end
 
-  # RubyLLM 2.0 owns message ordering internally, so filter the fully-loaded
-  # persisted history at the point where it is synchronized into the chat.
+  # Filter the loaded transcript without interpreting native provider blocks.
+  # Keep this adapter covered by native persistence/replay tests on upgrades.
   def eager_load_messages
     records = order_messages_for_llm(super)
     users = records.select { |message| message.role == "user" }

@@ -156,23 +156,15 @@ class ChatRun < ApplicationRecord
   end
 
   def pending_tool_approvals
-    approval_tool_calls.select do |tool_call|
-      tool_call.metadata["requires_approval"] && tool_call.approval.in?([ nil, "pending" ])
-    end
+    call_ids = pending_questions.select(&:approval?).map { |question| question.tool_call.id }
+    approval_tool_calls.select { |tool_call| call_ids.include?(tool_call.tool_call_id) }
   end
 
-  # Use RubyLLM's persisted questions, scoped to this run.
+  # Native persisted questions are readable without binding an agent or its
+  # tools. This layer only scopes them to the application's initiating run.
   def pending_questions
-    calls = approval_tool_calls
-    call_ids = calls.map(&:tool_call_id)
-    questions = chat.pending_questions.select { |question| call_ids.include?(question.tool_call.id) }
-    # HTTP reads have no agent toolset bound. Reconstruct the native question
-    # from the approval metadata written when the authorized worker parked.
-    pending_tool_approvals.each do |call|
-      next if call.result_id.present? || questions.any? { |question| question.id == call.tool_call_id }
-      questions << RubyLLM::Question.approval(call.to_llm, chat: chat)
-    end
-    questions
+    call_ids = approval_tool_calls.map(&:tool_call_id)
+    chat.pending_questions.select { |question| call_ids.include?(question.tool_call.id) }
   end
 
   # Customize this application policy for tools requiring a separate reviewer.

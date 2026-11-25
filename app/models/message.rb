@@ -212,6 +212,14 @@ class Message < ApplicationRecord
   #
   attr_accessor :llm_context_summary, :llm_context_member
 
+  # Visible text is only part of a native message. Provider checkpoints and
+  # signed reasoning must survive reload, and cannot be replaced by a summary
+  # generated from content alone. Leave their interpretation to RubyLLM.
+  def llm_replay_payload?
+    raw_content.present? || raw_reasoning.present? || thinking.present? ||
+      server_tool_calls.any? || continuation.present? || attachments.attached?
+  end
+
   def to_llm
     llm_message = super
     return llm_message unless role == "user"

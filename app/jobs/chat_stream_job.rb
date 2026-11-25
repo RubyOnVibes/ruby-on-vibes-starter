@@ -46,9 +46,14 @@ class ChatStreamJob < ApplicationJob
           interval = tasks.map { |task| task.poll_interval.to_f.positive? ? task.poll_interval.to_f : 5 }.min.clamp(1, 300)
           @chat_run.dispatch!(wait: interval)
         end
-      else
+      # Finalization reads the persisted transcript independently of runtime
+      # instructions, which RubyLLM can reapply after a halted tool on reload.
+      elsif Chat.find(@chat.id).complete?
         @chat_run.update!(status: :completed, resume_at: nil)
       end
+      # A duplicate may have returned busy before another worker parked and a
+      # person answered. No questions/tasks then remain, but the approved call
+      # still needs execution. Keep its recovery intent until native completion.
     end
     @llm_msg&.broadcast_upsert_to_chat!
   rescue RubyLLM::CancelledError

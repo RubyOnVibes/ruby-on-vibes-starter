@@ -93,6 +93,28 @@ immutable approved evidence belongs in application records with digest/blob
 references. Tool round/call limits apply per completion, not as lifetime spending
 budgets. Prompt caching and fallback models remain explicit environment opt-ins.
 
+## Conversation history and compaction
+
+Native messages can contain provider checkpoints, signed reasoning, tool-search
+state or attachments without visible text. The history adapter preserves those
+payloads. Explicit application exclusions (`skip_llm_context`, `compacted`) still
+apply; RubyLLM interprets and replays the retained provider state.
+
+The application summarizer handles text transcripts and retains the original
+messages for the UI. Its expiring lease checks ownership when publishing a
+summary and when releasing the lease. Clearing a chat revokes the lease so an
+old summarizer cannot restore deleted conversation content. A live native claim
+also prevents summary publication.
+
+Text summarization skips transcripts containing native replay payloads, including
+attachments and reasoning. It cannot safely replace opaque provider state with a
+text summary. Purposes needing long rich conversations should explicitly choose
+supported native provider compaction (`with_compaction` or `compact`) and test
+their selected provider/model. These APIs are not supported uniformly. Tool
+result context budgets remain enabled, but do not summarize the entire history.
+Without a suitable compaction strategy, start a new conversation before reaching
+the context limit; the job reports an overflow safely rather than dropping state.
+
 ## Validation
 
 Run `bundle exec rspec`, `bin/rails zeitwerk:check`,

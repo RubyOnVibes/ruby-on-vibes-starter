@@ -79,7 +79,9 @@ class ChatsController < ApplicationController
     authorize @chat, :update?
 
     @chat.transaction do
-      @chat.update!(compaction_summary: nil, last_compacted_at: nil)
+      # Revoke an in-flight summarizer before clearing its source transcript.
+      @chat.update!(compaction_summary: nil, last_compacted_at: nil,
+        compacting_since: nil, compaction_token: nil)
 
       # Destroy messages so RubyLLM usage/tool-call records and application
       # attachments/mentions are cleaned up through their associations.

@@ -11,10 +11,9 @@
 # user-role source context by Chat#eager_load_messages. Original messages are preserved in DB
 # marked `compacted: true` for audit trail and UI display.
 #
-# Concurrency: Uses `compacting_since` datetime column as a lock. Atomic
-# UPDATE with WHERE clause ensures only one process compacts a given chat.
-# Stale locks auto-expire after LOCK_TIMEOUT (process crash recovery).
-# Works on both SQLite and Postgres.
+# Concurrency: An expiring lease carries a unique ownership token. Publication
+# and release both check that token, so an expired worker cannot overwrite a
+# newer summary or release another worker's lease. Works on SQLite and Postgres.
 #
 # Usage:
 #   Chat::CompactionService.new(chat).compact_if_needed!  # normal auto-compact
@@ -41,7 +40,8 @@ class Chat::CompactionService
   # Auto-compact if threshold exceeded and cooldown elapsed.
   def compact_if_needed!
     return false unless should_compact?
-    with_compaction_lock { perform_compaction! }
+    # Another worker may have summarized since this Chat instance was loaded.
+    with_compaction_lock { should_compact? && perform_compaction! }
   end
 
   # Compact regardless of cooldown (for manual/UI trigger).
@@ -64,12 +64,13 @@ class Chat::CompactionService
 
   # --- Concurrency lock (works on SQLite + Postgres) ---
   #
-  # Atomic UPDATE ensures only one process can acquire the lock per chat.
-  # Stale locks (from crashed processes) auto-expire after LOCK_TIMEOUT.
+  # Never hold a database transaction during the model request. A stale worker
+  # may finish its request, but only the current lease owner can publish it.
 
   def with_compaction_lock
     return false unless acquire_compaction_lock!
     begin
+      @chat.reload
       yield
     ensure
       release_compaction_lock!
@@ -77,10 +78,13 @@ class Chat::CompactionService
   end
 
   def acquire_compaction_lock!
-    rows = Chat.where(id: @chat.id)
-      .where("compacting_since IS NULL OR compacting_since < ?", LOCK_TIMEOUT.ago)
-      .update_all(compacting_since: Time.current)
+    token = SecureRandom.uuid
+    lease = Chat.arel_table[:compacting_since]
+    rows = idle_chat_scope
+      .where(lease.eq(nil).or(lease.lt(LOCK_TIMEOUT.ago)))
+      .update_all(compacting_since: Time.current, compaction_token: token)
     if rows > 0
+      @compaction_token = token
       true
     else
       Rails.logger.info "[Compaction] Chat #{@chat.id}: skipped, already in progress"
@@ -89,7 +93,16 @@ class Chat::CompactionService
   end
 
   def release_compaction_lock!
-    @chat.update_columns(compacting_since: nil)
+    Chat.where(id: @chat.id, compaction_token: @compaction_token)
+      .update_all(compacting_since: nil, compaction_token: nil)
+    @compaction_token = nil
+  end
+
+  # Native RubyLLM claims stay authoritative for conversation execution. A
+  # competing job may start while we summarize; publication checks again.
+  def idle_chat_scope
+    claim = Chat.arel_table[:claimed_until]
+    Chat.where(id: @chat.id).where(claim.eq(nil).or(claim.lteq(Time.current)))
   end
 
   # --- Summary model ---
@@ -110,15 +123,21 @@ class Chat::CompactionService
     # LLM call OUTSIDE transaction — if it fails, DB is untouched
     summary_text = generate_summary(messages_to_compact, previous_summary)
 
-    ActiveRecord::Base.transaction do
-      Message.where(id: compacted_message_ids).update_all(compacted: true)
-      @chat.update_columns(
-        compaction_summary: summary_text,
-        last_compacted_at: Time.current
-      )
+    published = Chat.transaction do
+      # The conditional write takes the row lock before any message is hidden.
+      # Losing or outliving the lease leaves both summary and transcript intact.
+      owned = idle_chat_scope.where(compaction_token: @compaction_token)
+        .where(Chat.arel_table[:compacting_since].gteq(LOCK_TIMEOUT.ago))
+      if owned.update_all(compaction_summary: summary_text, last_compacted_at: Time.current) == 1
+        @chat.messages.where(id: compacted_message_ids).update_all(compacted: true)
+        true
+      else
+        false
+      end
     end
+    return false unless published
 
-    @chat.messages.reset  # Clear AR association cache after update_all
+    @chat.reload # Refresh the summary and clear the transcript association cache.
     broadcast_compacted_messages(compacted_message_ids)
     Rails.logger.info "[Compaction] Chat #{@chat.id}: compacted #{messages_to_compact.size} messages"
     true
@@ -171,17 +190,22 @@ class Chat::CompactionService
   end
 
   def active_messages_scope
-    @chat.messages.where(compacted: false, skip_llm_context: false)
+    @chat.messages.where(compacted: false, skip_llm_context: false).where.not(role: :system)
   end
 
   # --- Partitioning ---
 
   def partition_messages
     all = active_messages_scope
-      .order(:created_at)
+      .with_attached_attachments
+      .order(:created_at, :id)
       .to_a
 
     return [ all, [] ] if all.size < MIN_MESSAGES_TO_COMPACT
+    # Text summaries cannot represent opaque provider checkpoints, tool-search
+    # state, reasoning blocks or attachments. Keep that transcript intact; a
+    # purpose needing rich-history compaction can use its provider's native API.
+    return [ all, [] ] if all.any?(&:llm_replay_payload?)
 
     # Find where the last N turns start (turn = user msg + response chain)
     turn_idx = find_turn_boundary(all, KEEP_RECENT_TURNS)
@@ -225,7 +249,9 @@ class Chat::CompactionService
   def find_safe_split(msgs, proposed)
     idx = proposed
     idx -= 1 while idx > 0 && !(msgs[idx].role.to_s == "user" && !msgs[idx].tool_result?)
-    idx == 0 ? proposed : idx
+    # If the retained-token boundary lies inside the first turn, keep that
+    # entire turn. Returning the proposed index could orphan a tool result.
+    idx
   end
 
   # --- Summary generation ---

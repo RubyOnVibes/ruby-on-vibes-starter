@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_26_000200) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_26_000300) do
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.string "name", null: false
     t.text "body"
@@ -269,6 +269,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_26_000200) do
     t.string "claim_token"
     t.datetime "claimed_until"
     t.string "purpose", default: "assistant", null: false
+    t.string "compaction_token"
     t.index ["claimed_until"], name: "index_chats_on_claimed_until", where: "claim_token IS NOT NULL"
     t.index ["has_multiple_members"], name: "index_chats_on_has_multiple_members"
     t.index ["member_id"], name: "index_chats_on_member_id"

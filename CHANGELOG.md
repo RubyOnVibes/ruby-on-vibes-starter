@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased — RubyLLM documentation alignment
+## Unreleased — Native replay and concurrency hardening
+
+- Preserve native provider checkpoints, reasoning, attachment-only messages and empty terminal responses during history reload; exercise actual compaction and subsequent provider request rendering with a scripted HTTP adapter.
+- Fence text-summary publication and lease release by ownership and expiry; revoke the lease when clearing a chat and preserve opaque native replay state instead of text-summarizing it.
+- Use native persisted questions directly while retaining application approval authorization and audit metadata.
+- Require native conversation completion before a duplicate delivery can complete its application run, including a human approval that races with that delivery.
+- Keep tool chains and system instructions intact at summary boundaries, and recheck cooldown after acquiring the summary lease.
+
+Validation: 510 passing specs, native replay and deterministic concurrency regressions, fresh migration up/down/up, real queue delivery and crash-recovery probes, Zeitwerk, clean RuboCop, and no new Brakeman warnings. No live provider requests or deployments. The comparative application benchmark remains unrun.
+
+## 2026-11-25 — RubyLLM documentation alignment
 
 - Keep mixed native task rounds parked when any task requires human input; resume background polling after the explicit callback resolves that wait.
 - Keep unexpected errors from default tools out of model-visible results and route them through the existing safe run failure handler.

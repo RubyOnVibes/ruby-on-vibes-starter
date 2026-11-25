@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 require 'rails_helper'
+require 'ruby_llm/test_helper'
 
 RSpec.describe ChatRun, type: :model do
+  include RubyLLM::TestHelper
   let(:chat) { chats(:team_chat) }
 
   before do
@@ -52,6 +54,7 @@ RSpec.describe ChatRun, type: :model do
       tool_call = message.ruby_llm_tool_calls.create!(
         tool_call_id: "approval_1",
         name: "examples__rename_chat",
+        approval: "pending",
         arguments: { title: "New title" },
         metadata: { requires_approval: true, requester_member_id: member.id, chat_run_id: run.id }
       )
@@ -70,6 +73,7 @@ RSpec.describe ChatRun, type: :model do
         message.ruby_llm_tool_calls.create!(
           tool_call_id: "approval_#{index}",
           name: "examples__rename_chat",
+          approval: "pending",
           arguments: { title: "Title #{index}" },
           metadata: { requires_approval: true, requester_member_id: member.id, chat_run_id: run.id }
         )
@@ -80,6 +84,43 @@ RSpec.describe ChatRun, type: :model do
 
       expect(first_resume).to be false
       expect(second_resume).to be true
+    end
+  end
+
+  describe '#pending_questions' do
+    it 'reads a native approval after reload without binding tools, then resumes its original run' do
+      chat.chat_runs.active.delete_all
+      chat.messages.destroy_all
+      member = members(:alice_team_member)
+      original_name = chat.name
+      allow(Turbo::StreamsChannel).to receive(:broadcast_action_to)
+      allow(Turbo::StreamsChannel).to receive(:broadcast_append_to)
+      allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ Examples::RenameChatTool ])
+      stub_replies tool_call(Examples::RenameChatTool.tool_name, title: "Approved title"), "Renamed."
+      input = chat.messages.create!(role: :user, content: "Rename this chat", member: member, user: member.user)
+      run = create_run!(input_message: input, initiated_by_member: member)
+
+      ChatStreamJob.perform_now(run.id)
+
+      expect(run.reload).to be_status_awaiting_approval
+      expect(chat.reload.name).to eq(original_name)
+      fresh_run = described_class.find(run.id)
+      expect(fresh_run.chat).not_to receive(:to_llm)
+      question = fresh_run.pending_questions.sole
+      expect(question).to be_approval
+      expect(fresh_run.pending_tool_approvals.map(&:tool_call_id)).to eq([ question.tool_call.id ])
+
+      decided, resume = fresh_run.decide_tool_call!(question.id, decision: "approved", member: member)
+
+      expect(resume).to be true
+      expect(decided.reload.metadata["decided_by_member_id"]).to eq(member.id)
+      expect(fresh_run.pending_questions).to be_empty
+      expect(fresh_run.pending_tool_approvals).to be_empty
+      ChatStreamJob.perform_now(run.id)
+      expect(run.reload).to be_status_completed
+      expect(run.initiated_by_member).to eq(member)
+      expect(chat.reload.name).to eq("Approved title")
+      expect(chat.messages.where(role: :user).count).to eq(1)
     end
   end
 
