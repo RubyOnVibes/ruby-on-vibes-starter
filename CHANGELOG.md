@@ -8,8 +8,11 @@
 - Admit scheduled and webhook triggers through a deduplicated delivery inbox, including events received while a chat is busy.
 - Keep untrusted mentioned-record and summary content out of application instructions; reduce the default assistant context and use generic unexpected-error responses.
 - Align the guides and coding-agent conventions with native purposes, tools and task execution.
+- Clear the existing style-lint backlog using the repository's Rails rules.
 
 This revision targets fresh applications. The fresh schema and migration chain omit the prototype task storage.
+
+Validation: 480 passing specs, fresh migration replay, native worker-interruption and duplicate-delivery probes, actual Solid Queue delivery in a separate worker, shared process broadcasts, client/island/SSR builds, Zeitwerk, and clean RuboCop and dependency audits. Brakeman reports no new warnings; its one existing reviewed ignore remains. Provider replies are scripted; live model quality, PostgreSQL concurrency and platform deployment remain separate checks.
 
 ## 2026-11-25 — Durable agent foundations
 
@@ -20,7 +23,7 @@ This revision targets fresh applications. The fresh schema and migration chain o
 - Keep the document intake demonstration on its own branch; the starter contains the reusable primitives.
 - Establish standalone `main` as the canonical starter and document guarded synchronization into the platform's embedded template.
 
-Validation includes 545 passing starter specs, the matching embedded-template suite, process-level recovery checks, and a separate 560-spec document intake demo with a local browser/worker-restart exercise. Live provider behavior and platform deployment compatibility remain separate validation steps. The repository's existing style-lint backlog remains open.
+Validation includes 545 passing starter specs, the matching embedded-template suite, process-level recovery checks, and a separate 560-spec document intake demo with a local browser/worker-restart exercise. Live provider behavior and platform deployment compatibility remain separate validation steps. The style-lint backlog was still open at that release snapshot; the consolidation above clears it.
 
 The [maintenance review](docs/maintenance-2026-11.md) records that release snapshot. See [agent foundations](docs/agent-foundations.md) for the current design and its limits.
 

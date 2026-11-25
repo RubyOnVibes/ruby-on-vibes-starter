@@ -88,12 +88,14 @@ budgets. Prompt caching and fallback models remain explicit environment opt-ins.
 ## Validation
 
 Run `bundle exec rspec`, `bin/rails zeitwerk:check`,
-`bundle exec ruby script/check_durable_execution.rb`, and
+`bundle exec ruby script/check_durable_execution.rb`,
+`bundle exec ruby script/check_job_delivery.rb`, and
 `bundle exec ruby script/check_shared_broadcasts.rb`.
 
 Specs use native RubyLLM execution with scripted provider responses to exercise
 authorization, parked decisions, native tasks, delivery races and usage. The
-process probes cover worker interruption, claim expiry, preserved results and
-shared broadcasts using disposable SQLite databases. These establish execution
+process probes cover worker interruption, claim expiry, preserved results, real
+Solid Queue delivery in a separate worker, harmless queued redelivery and shared
+broadcasts using disposable SQLite databases. These establish execution
 behavior, not model quality or production PostgreSQL concurrency. Live evaluation
 and deployment qualification remain explicit, separate checks.

@@ -48,8 +48,7 @@ direct RubyLLM calls from application code. Restart after changing them.
   billing, administration and analytics.
 
 Slow tools use **one native task protocol**. Ordinary Rails jobs perform the
-work; domain records hold business progress and evidence. The old application
-task runner and its polling UI have been removed. See the opt-in
+work; domain records hold business progress and evidence. See the opt-in
 [native task recipe](docs/native-task-recipe.md) for an approval-gated report
 publication with a unique business key, immutable input and worker resumption.
 
@@ -80,6 +79,7 @@ Other providers require explicit configuration and integration checks.
 bundle exec rspec
 bin/rails zeitwerk:check
 bundle exec ruby script/check_durable_execution.rb
+bundle exec ruby script/check_job_delivery.rb
 bundle exec ruby script/check_shared_broadcasts.rb
 ```
 
