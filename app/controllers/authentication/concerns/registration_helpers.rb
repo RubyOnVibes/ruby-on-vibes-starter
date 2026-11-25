@@ -9,4 +9,3 @@ module Authentication::Concerns::RegistrationHelpers
     new_user_registration_url
   end
 end
-

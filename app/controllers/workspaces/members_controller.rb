@@ -5,7 +5,7 @@ module Workspaces
     before_action :authenticate_user!
     before_action :set_workspace
     before_action :require_non_personal_workspace!
-    before_action :set_member, only: [:edit, :update, :destroy]
+    before_action :set_member, only: [ :edit, :update, :destroy ]
 
     def index
       authorize Member.new(workspace: @workspace), :index?

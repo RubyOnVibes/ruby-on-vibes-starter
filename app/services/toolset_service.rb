@@ -52,7 +52,7 @@ class ToolsetService
     tools = [
       CurrentDateTimeTool,      # Returns current date/time in user's timezone
       RandomNumberTool,         # Generates true random numbers (no network needed)
-      WebFetchTool,             # Fetches and extracts text from web pages
+      WebFetchTool             # Fetches and extracts text from web pages
     ]
 
     tools << Examples::RenameChatTool if RubyOnVibes.debug_tools?
@@ -60,7 +60,7 @@ class ToolsetService
     tools
   end
 
-  def tools    
+  def tools
     # Instantiate each tool with chat and sender context (chat.workspace and sender_workspace differ when cross-workspace senders):
     tool_classes.map do |tool_class|
       tool_class.new(

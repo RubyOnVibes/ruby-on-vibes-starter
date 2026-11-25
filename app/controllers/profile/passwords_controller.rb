@@ -21,7 +21,7 @@ module Profile
     private
 
     def password_params
-      password_keys = [:current_password, :password, :password_confirmation]
+      password_keys = [ :current_password, :password, :password_confirmation ]
       params.expect(user: password_keys)
     end
   end

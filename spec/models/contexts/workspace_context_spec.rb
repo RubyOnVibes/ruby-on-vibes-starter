@@ -4,7 +4,7 @@ require 'rails_helper'
 
 RSpec.describe WorkspaceContext, type: :model do
   # Contract test: documents what data the LLM receives when an Workspace is @mentioned
-  
+
   describe '.from_record' do
     context 'team workspace' do
       let(:org) { workspaces(:team_org) }
@@ -49,7 +49,7 @@ RSpec.describe WorkspaceContext, type: :model do
     it 'returns human-readable summary for team' do
       org = workspaces(:team_org)
       context = described_class.from_record(org)
-      
+
       summary = context.summary
       expect(summary).to include('Team')
       expect(summary).to include(org.name)
@@ -60,7 +60,7 @@ RSpec.describe WorkspaceContext, type: :model do
     it 'returns human-readable summary for personal' do
       org = workspaces(:alice_personal)
       context = described_class.from_record(org)
-      
+
       summary = context.summary
       expect(summary).to include('Personal')
     end
@@ -79,7 +79,7 @@ RSpec.describe WorkspaceContext, type: :model do
 
     it 'exports valid JSON schema with enum' do
       schema = context.to_json_schema
-      
+
       # Schema name represents the model, not the Context wrapper
       expect(schema[:name]).to eq('Workspace')
       expect(schema[:schema][:properties][:type][:enum]).to eq(%w[personal team])
@@ -87,4 +87,3 @@ RSpec.describe WorkspaceContext, type: :model do
     end
   end
 end
-

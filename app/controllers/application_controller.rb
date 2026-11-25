@@ -24,7 +24,7 @@ class ApplicationController < ActionController::Base
   after_action :set_vibes_request_id
 
   def set_vibes_request_id
-    response.set_header('X-Vibes-Request-ID', request.uuid) if request.uuid
+    response.set_header("X-Vibes-Request-ID", request.uuid) if request.uuid
   end
 
   def require_sign_up_or_current_user!

@@ -4,6 +4,6 @@ class ApplicationMailer < ::ActionMailer::Base
   default from: -> { RubyOnVibes.default_from_email }
 
   layout "mailer"
-  
+
   helper VibesHelper
 end

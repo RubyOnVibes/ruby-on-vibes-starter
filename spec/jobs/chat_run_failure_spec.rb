@@ -37,7 +37,7 @@ RSpec.describe "Terminal native run settlement", type: :job do
       def resume(*) = raise("A failed run must never resume its old operation")
     end
     stub_const("FailureSettlementTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([FailureSettlementTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ FailureSettlementTool ])
   end
 
   def park_task
@@ -133,7 +133,7 @@ RSpec.describe "Terminal native run settlement", type: :job do
       def execute = raise("Cancellation must not grant approval")
     end
     stub_const("NeverApprovedFixtureTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([NeverApprovedFixtureTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ NeverApprovedFixtureTool ])
     input = chat.messages.create!(role: :user, content: "Request approval", member: member, user: member.user)
     run = chat.chat_runs.create!(input_message: input, initiated_by_member: member)
     stub_replies tool_call(:never_approved_fixture)

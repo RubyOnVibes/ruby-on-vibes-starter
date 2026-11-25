@@ -3,7 +3,7 @@ module ComponentsHelper
   # Consolidates: BadgesHelper, ButtonsHelper, NavHelper
 
   # ==================== BADGES ====================
-  
+
   # Renders a badge component
   # @example
   #   <%= badge "Active", color: "bg-success/10 text-success" %>
@@ -14,12 +14,12 @@ module ComponentsHelper
     text, options = nil, text || {} if block
     base = options.delete(:base) || "rounded-sm py-0.5 px-2 text-xs inline-block font-semibold leading-normal mr-2"
     color = options.delete(:color) || "bg-muted text-muted-foreground"
-    options[:class] = Array.wrap(options[:class]) + [base, color]
+    options[:class] = Array.wrap(options[:class]) + [ base, color ]
     tag.div(text, **options, &block)
   end
 
   # ==================== BUTTONS ====================
-  
+
   # Generates button text with loading state for Turbo
   # Preserves opacity-25 opacity-75 during purge
   # @example
@@ -41,7 +41,7 @@ module ComponentsHelper
   end
 
   # ==================== NAVIGATION ====================
-  
+
   # Renders a link with active state highlighting
   # @example
   #   <%= active_link_to "Dashboard", dashboard_path, active_class: "font-bold" %>
@@ -100,4 +100,3 @@ module ComponentsHelper
     end
   end
 end
-

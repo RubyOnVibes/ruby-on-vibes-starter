@@ -127,7 +127,7 @@ RSpec.describe Workspace::Roles, type: :model do
 
     it 'only includes roles that are true' do
       member.update!(admin: true, member: false)
-      expect(member.active_roles).to eq([:admin])
+      expect(member.active_roles).to eq([ :admin ])
     end
   end
 

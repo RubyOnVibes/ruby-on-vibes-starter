@@ -28,7 +28,7 @@ RSpec.describe "ChatRun questions", type: :request do
       mcp_state: { "requests" => questions.map(&:to_h) }
     )
     ids = questions.map { |question| RubyLLM::Question.from_h(question.to_h, tool_call: call.to_llm).id }
-    [run, call, ids]
+    [ run, call, ids ]
   end
 
   def answer_question(run, id, answer)
@@ -97,21 +97,21 @@ RSpec.describe "ChatRun questions", type: :request do
           }
         }
       },
-      "required" => ["accounts"]
+      "required" => [ "accounts" ]
     }
     run, call, ids = pending_questions!(RubyLLM::Question.asked(0, "Which accounts?", schema: schema))
 
     payload = JSON.parse(call.message.reload.serialize_tool_calls.to_json)
     field = payload.first.fetch("questions").first.fetch("fields").sole
     expect(field).to include(
-      "type" => "array", "choices" => [17, 42],
+      "type" => "array", "choices" => [ 17, 42 ],
       "choice_titles" => { "17" => "River bank", "42" => "Money bank" }
     )
 
-    answer_question(run, ids.first, { accounts: [17, 42] })
+    answer_question(run, ids.first, { accounts: [ 17, 42 ] })
 
     expect(response).to have_http_status(:ok)
-    expect(call.reload.mcp_state.dig("requests", 0, "response", "content", "accounts")).to eq([17, 42])
+    expect(call.reload.mcp_state.dig("requests", 0, "response", "content", "accounts")).to eq([ 17, 42 ])
     expect(ChatStreamJob).to have_received(:perform_later).once
   end
 

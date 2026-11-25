@@ -237,8 +237,8 @@ RSpec.describe Plan, type: :model do
 
     it 'returns array when set' do
       plan = Plan.new
-      plan.features = ['Feature 1', 'Feature 2']
-      expect(plan.features).to eq(['Feature 1', 'Feature 2'])
+      plan.features = [ 'Feature 1', 'Feature 2' ]
+      expect(plan.features).to eq([ 'Feature 1', 'Feature 2' ])
     end
   end
 

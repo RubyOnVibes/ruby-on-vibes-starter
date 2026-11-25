@@ -4,8 +4,8 @@ module Vibes
       # POST /vibes/api/users/admins
       # Body: { users: [{ email:, password:, full_name: }, ...] }
       def create_admins
-        return render json: { success: false, error: 'Provide users array' }, status: :bad_request unless user_params.is_a?(Array) && user_params.size == 2
-        return render json: { success: false, error: 'Admins already seeded' }, status: :bad_request unless User.admins.count < 2
+        return render json: { success: false, error: "Provide users array" }, status: :bad_request unless user_params.is_a?(Array) && user_params.size == 2
+        return render json: { success: false, error: "Admins already seeded" }, status: :bad_request unless User.admins.count < 2
 
         @created = []
         @errors = []
@@ -42,9 +42,9 @@ module Vibes
       def user_params
         Array(params[:users]).map do |user_hash|
           {
-            email: user_hash[:email] || user_hash['email'],
-            password: user_hash[:password] || user_hash['password'],
-            full_name: user_hash[:full_name] || user_hash['full_name']
+            email: user_hash[:email] || user_hash["email"],
+            password: user_hash[:password] || user_hash["password"],
+            full_name: user_hash[:full_name] || user_hash["full_name"]
           }
         end
       end

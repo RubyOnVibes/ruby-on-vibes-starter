@@ -1,5 +1,5 @@
 class InvitationsController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:show]
+  skip_before_action :authenticate_user!, only: [ :show ]
   before_action :set_invitation
   before_action :redirect_with_invite_link_stored_maybe!
 

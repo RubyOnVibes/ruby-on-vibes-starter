@@ -16,8 +16,8 @@ class CreateAgents < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :agents, [:workspace_id, :identifier], unique: true
-    add_index :agents, [:workspace_id, :active]
+    add_index :agents, [ :workspace_id, :identifier ], unique: true
+    add_index :agents, [ :workspace_id, :active ]
     add_index :agents, :webhook_token, unique: true
   end
 end

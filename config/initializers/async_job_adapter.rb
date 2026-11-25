@@ -1,4 +1,4 @@
-require 'async/job/processor/inline'
+require "async/job/processor/inline"
 
 Rails.application.configure do
   config.async_job.define_queue "default" do

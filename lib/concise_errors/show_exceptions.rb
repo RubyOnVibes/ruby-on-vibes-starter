@@ -14,7 +14,7 @@ module ConciseErrors
 
     def call(env)
       request = ActionDispatch::Request.new(env)
-      
+
       # If full error page is requested, use DebugExceptions to render it
       if full_error_requested?(request)
         return debug_exceptions_middleware.call(env)
@@ -30,27 +30,27 @@ module ConciseErrors
       wrapper = build_wrapper(env)
 
       formatter = Formatter.new(wrapper, request, ConciseErrors.configuration)
-      
+
       [
         wrapper.status_code,
         { "Content-Type" => formatter.content_type },
-        [formatter.body]
+        [ formatter.body ]
       ]
     end
 
     def build_wrapper(env)
       exception = env["action_dispatch.exception"]
       backtrace_cleaner = env["action_dispatch.backtrace_cleaner"] || ConciseErrors.configuration.cleaner
-      
+
       # Ensure we have backtrace cleaner
       unless backtrace_cleaner
         backtrace_cleaner = if defined?(Rails) && Rails.respond_to?(:backtrace_cleaner)
                               Rails.backtrace_cleaner
-                            else
+        else
                               nil
-                            end
+        end
       end
-      
+
       ActionDispatch::ExceptionWrapper.new(backtrace_cleaner, exception)
     end
 
@@ -65,7 +65,7 @@ module ConciseErrors
       # Use Rails' DebugExceptions to show the full error page
       @debug_exceptions_middleware ||= begin
         debug_ex = ::ActionDispatch::DebugExceptions.new(@app)
-        
+
         # If WebConsole is available, wrap it
         if defined?(WebConsole::Middleware)
           WebConsole::Middleware.new(debug_ex)
@@ -76,4 +76,3 @@ module ConciseErrors
     end
   end
 end
-

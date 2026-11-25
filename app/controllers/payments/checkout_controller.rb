@@ -2,8 +2,8 @@ class Payments::CheckoutController < ApplicationController
   before_action :require_sign_up_or_current_user!
   before_action :require_current_workspace_admin!
   before_action :set_plan
-  before_action :redirect_if_already_subscribed!, only: [:show]
-  before_action :redirect_if_past_due_or_unpaid!, only: [:show]
+  before_action :redirect_if_already_subscribed!, only: [ :show ]
+  before_action :redirect_if_past_due_or_unpaid!, only: [ :show ]
 
   def show
     if RubyOnVibes.config.stripe?
@@ -56,7 +56,7 @@ class Payments::CheckoutController < ApplicationController
     {
       trial_settings: { end_behavior: { missing_payment_method: "pause" } },
       trial_period_days: trial_period_days,
-      metadata: metadata_params.to_h,
+      metadata: metadata_params.to_h
     }.compact
   end
 

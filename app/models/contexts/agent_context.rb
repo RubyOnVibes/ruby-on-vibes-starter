@@ -41,7 +41,7 @@ class AgentContext < RecordContext
   end
 
   def summary
-    parts = [data[:name]]
+    parts = [ data[:name] ]
     parts << data[:status]
     parts << "schedule: #{data[:schedule]}" if data[:schedule]
     parts.join(" — ")

@@ -136,8 +136,8 @@ RSpec.describe Agent, type: :model do
     end
 
     it 'resolves tool class names to classes' do
-      agent = create_agent!(tool_config: ["CurrentDateTimeTool", "WebFetchTool"])
-      expect(agent.configured_tool_classes).to eq([CurrentDateTimeTool, WebFetchTool])
+      agent = create_agent!(tool_config: [ "CurrentDateTimeTool", "WebFetchTool" ])
+      expect(agent.configured_tool_classes).to eq([ CurrentDateTimeTool, WebFetchTool ])
     end
 
     it 'preserves an explicit empty selection' do
@@ -147,7 +147,7 @@ RSpec.describe Agent, type: :model do
 
     it 'rejects existing Ruby classes outside the application tool registry' do
       agent = create_agent!
-      agent.tool_config = ["File"]
+      agent.tool_config = [ "File" ]
       expect(agent).not_to be_valid
       expect(agent.errors[:tool_config]).to be_present
       expect { agent.configured_tool_classes }.to raise_error(ToolsetService::InvalidToolConfiguration)
@@ -155,7 +155,7 @@ RSpec.describe Agent, type: :model do
 
     it 'rejects unknown tools rather than silently changing the requested capabilities' do
       expect {
-        create_agent!(tool_config: ["CurrentDateTimeTool", "NonexistentTool"])
+        create_agent!(tool_config: [ "CurrentDateTimeTool", "NonexistentTool" ])
       }.to raise_error(ActiveRecord::RecordInvalid)
     end
   end

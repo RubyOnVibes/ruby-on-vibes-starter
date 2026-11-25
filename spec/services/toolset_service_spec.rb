@@ -23,7 +23,7 @@ RSpec.describe ToolsetService do
   it "does not instantiate arbitrary constants stored in legacy records" do
     agent = Agent.create!(chat: chat, member: member, workspace: member.workspace,
       name: "Restricted", identifier: "restricted")
-    agent.update_column(:tool_config, ["File"])
+    agent.update_column(:tool_config, [ "File" ])
     chat.reload
 
     expect { service.tools }.to raise_error(ToolsetService::InvalidToolConfiguration)
@@ -35,16 +35,16 @@ RSpec.describe ToolsetService do
       def execute = "Done"
     end
     stub_const("OptionalApplicationTool", custom_tool)
-    allow(described_class).to receive(:additional_tool_classes).and_return([OptionalApplicationTool])
+    allow(described_class).to receive(:additional_tool_classes).and_return([ OptionalApplicationTool ])
 
-    expect(described_class.resolve(["OptionalApplicationTool"])).to eq([OptionalApplicationTool])
+    expect(described_class.resolve([ "OptionalApplicationTool" ])).to eq([ OptionalApplicationTool ])
     expect(service.tool_classes).not_to include(OptionalApplicationTool)
   end
 
   it "rejects disabled debug tools even when a persisted agent names one" do
     allow(RubyOnVibes).to receive(:debug_tools?).and_return(false)
 
-    expect { described_class.resolve(["Examples::RenameChatTool"]) }
+    expect { described_class.resolve([ "Examples::RenameChatTool" ]) }
       .to raise_error(ToolsetService::InvalidToolConfiguration)
   end
 

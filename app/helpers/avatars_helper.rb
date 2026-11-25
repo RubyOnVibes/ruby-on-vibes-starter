@@ -32,7 +32,7 @@ module AvatarsHelper
 
     # Priority 1: Uploaded avatar via ActiveStorage
     if has_uploaded_avatar?(record)
-      return record.avatar.variant(resize_to_fit: [size, size])
+      return record.avatar.variant(resize_to_fit: [ size, size ])
     end
 
     # Priority 2+: Fallback based on strategy
@@ -125,7 +125,7 @@ module AvatarsHelper
   #
   def workspace_avatar(workspace, css_class: "size-8", pixel_size: 48)
     base_classes = "rounded-full shrink-0 object-cover"
-    combined_classes = [base_classes, css_class].join(" ")
+    combined_classes = [ base_classes, css_class ].join(" ")
 
     image_src = resolve_workspace_avatar_src(workspace, pixel_size)
     image_tag(image_src, class: combined_classes, alt: workspace.name)
@@ -160,4 +160,3 @@ module AvatarsHelper
     nil
   end
 end
-

@@ -8,7 +8,7 @@ RSpec.describe "Submitting durable chat turns", type: :request do
     allow(ChatStreamJob).to receive(:perform_later)
   end
 
-  [:running, :awaiting_approval, :awaiting_tasks].each do |state|
+  [ :running, :awaiting_approval, :awaiting_tasks ].each do |state|
     it "preserves a #{state} turn when another message is submitted" do
       run = chat.chat_runs.create!(status: state, initiated_by_member: members(:alice_personal_member))
       expect { post "/chats/#{chat.to_param}/messages", params: { content: "New request" }, as: :json }.not_to change(Message, :count)

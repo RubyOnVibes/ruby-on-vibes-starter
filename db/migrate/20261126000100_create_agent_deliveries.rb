@@ -16,7 +16,7 @@ class CreateAgentDeliveries < ActiveRecord::Migration[8.1]
       t.datetime :next_attempt_at
       t.timestamps
     end
-    add_index :agent_deliveries, [:agent_id, :trigger, :idempotency_key], unique: true
-    add_index :agent_deliveries, [:status, :next_attempt_at]
+    add_index :agent_deliveries, [ :agent_id, :trigger, :idempotency_key ], unique: true
+    add_index :agent_deliveries, [ :status, :next_attempt_at ]
   end
 end

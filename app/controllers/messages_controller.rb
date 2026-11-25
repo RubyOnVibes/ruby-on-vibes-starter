@@ -9,10 +9,10 @@
 #
 class MessagesController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_chat, only: [:create]
+  before_action :set_chat, only: [ :create ]
 
   MENTIONABLE_TYPES = %w[Chat Member Workspace].freeze
-  
+
   # POST /messages
   # POST /chats/:chat_id/messages
   def create
@@ -22,21 +22,21 @@ class MessagesController < ApplicationController
     raw_content = params[:content].to_s.strip
     mentions_data = Array(params[:mentions])
     uploaded_files = params[:attachments] || []
-    
+
     if raw_content.blank? && uploaded_files.empty?
       respond_to do |format|
         format.turbo_stream { head :unprocessable_content }
-        format.json { render json: { error: 'Content or files required' }, status: :unprocessable_content }
+        format.json { render json: { error: "Content or files required" }, status: :unprocessable_content }
       end
       return
     end
 
     resolved_mentions = resolve_mentions(mentions_data)
-    
+
     # Substitute @mentions with stable placeholders
     # "Hey @Chat 2" → "Hey <@chat_2abc>"
     processed_content = substitute_mentions(raw_content, resolved_mentions)
-    
+
     @chat.with_lock do
       if @chat.chat_runs.active.exists? || @chat.running?
         respond_to do |format|
@@ -60,7 +60,7 @@ class MessagesController < ApplicationController
         # Turbo will append the new message via broadcast
         head :ok
       end
-      
+
       format.json do
         render json: {
           success: true,
@@ -76,32 +76,32 @@ class MessagesController < ApplicationController
       format.json { render json: { error: "Chat already processing" }, status: :conflict }
     end
   end
-  
+
   private
-  
+
   def set_chat
     chat_id = params[:chat_id] || params[:message]&.[](:chat_id)
-    
+
     # Handle both prefixed IDs (chat_xxx) and numeric IDs for backwards compatibility
-    @chat = if chat_id.to_s.start_with?('chat_')
+    @chat = if chat_id.to_s.start_with?("chat_")
       current_member.chats.find_by_prefix_id(chat_id)
     else
       current_member.chats.find_by(id: chat_id)
     end
-    
+
     unless @chat
       respond_to do |format|
         format.turbo_stream { head :not_found }
-        format.json { render json: { error: 'Chat not found' }, status: :not_found }
+        format.json { render json: { error: "Chat not found" }, status: :not_found }
       end
     end
   end
 
   def resolve_mentions(mentions_data)
     mentions_data.filter_map do |mention|
-      mentioned_id = mention[:id] || mention['id']
-      model_type = normalize_mention_type(mention[:model] || mention['model'])
-      label = mention[:label] || mention['label']
+      mentioned_id = mention[:id] || mention["id"]
+      model_type = normalize_mention_type(mention[:model] || mention["model"])
+      label = mention[:label] || mention["label"]
 
       unless model_type && mentioned_id.present?
         Rails.logger.warn "[Mention] Skipped invalid mention for chat=#{@chat.id}"
@@ -144,19 +144,18 @@ class MessagesController < ApplicationController
   #
   def substitute_mentions(content, mentions_data)
     result = content.dup
-    
+
     mentions_data.each do |mention|
-      label = mention[:label] || mention['label']
-      stable_id = mention[:id] || mention['id']  # Now just :id, not nested
-      
+      label = mention[:label] || mention["label"]
+      stable_id = mention[:id] || mention["id"]  # Now just :id, not nested
+
       next unless label.present? && stable_id.present?
-      
+
       # Replace "@Chat 2" with "<@chat_xxx>"
       # Angle brackets prevent collisions with plain text
       result.gsub!(/@#{Regexp.escape(label)}/, "<@#{stable_id}>")
     end
-    
+
     result
   end
-  
 end

@@ -1,8 +1,8 @@
 class Authentication::RegistrationsController < Devise::RegistrationsController
   include Authentication::Concerns::RegistrationHelpers
 
-  before_action :configure_sign_up_params, only: [:create]
-  before_action :copy_password_to_confirmation, only: [:create]
+  before_action :configure_sign_up_params, only: [ :create ]
+  before_action :copy_password_to_confirmation, only: [ :create ]
 
   def create
     super do
@@ -13,7 +13,7 @@ class Authentication::RegistrationsController < Devise::RegistrationsController
   protected
 
   def configure_sign_up_params
-    devise_parameter_sanitizer.permit(:sign_up, keys: [:full_name])
+    devise_parameter_sanitizer.permit(:sign_up, keys: [ :full_name ])
   end
 
   def copy_password_to_confirmation

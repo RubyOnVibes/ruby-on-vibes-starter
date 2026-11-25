@@ -92,7 +92,7 @@ class Invitation < ApplicationRecord
       member = workspace.members.create!(user: user, roles: roles)
       destroy!
     end
-      
+
     # Store denormalized names so notification persists after workspace deletion
     accepted_params = {
       workspace: workspace,

@@ -151,7 +151,7 @@ class ChatStreamJob < ApplicationJob
         # we can't tell yet because tool calls aren't persisted until after_message.
         # For tool placeholders, no streaming chunks arrive so this is harmless.
         @llm_msg = latest
-        @accumulated = '' if defined?(@accumulated)
+        @accumulated = "" if defined?(@accumulated)
         @llm_msg.broadcast_upsert_to_chat!
       end
     end
@@ -186,7 +186,7 @@ class ChatStreamJob < ApplicationJob
   end
 
   def stream_response
-    @accumulated = ''
+    @accumulated = ""
     @chunk_count = 0
 
     @chat.complete do |chunk|
@@ -258,15 +258,15 @@ class ChatStreamJob < ApplicationJob
   rescue => e
     Rails.logger.error "[ChatStreamJob] Usage capture failed: #{e.class} - #{e.message}"
   end
-  
+
   def extract_chunk_text(chunk)
     case chunk
     when RubyLLM::Chunk
-      chunk.content || ''
+      chunk.content || ""
     when String
       chunk
     else
-      chunk.respond_to?(:content) ? (chunk.content || '') : chunk.to_s
+      chunk.respond_to?(:content) ? (chunk.content || "") : chunk.to_s
     end
   end
 

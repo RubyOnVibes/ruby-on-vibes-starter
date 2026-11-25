@@ -83,14 +83,14 @@ module Workspace::Roles
       case adapter
       when /postgresql/
         # PostgreSQL: use efficient JSONB containment operator
-        ["roles @> ?", { role => true }.to_json]
+        [ "roles @> ?", { role => true }.to_json ]
       when /sqlite/
         # SQLite: use json_extract (JSON1 extension, included by default in SQLite 3.38+)
         # json_extract returns 1 for true in SQLite
-        ["json_extract(roles, ?) = ?", "$.#{role}", 1]
+        [ "json_extract(roles, ?) = ?", "$.#{role}", 1 ]
       else
         # Fallback: use json_extract syntax (works for most modern databases)
-        ["json_extract(roles, ?) = ?", "$.#{role}", true]
+        [ "json_extract(roles, ?) = ?", "$.#{role}", true ]
       end
     end
 

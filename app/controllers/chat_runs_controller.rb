@@ -9,9 +9,9 @@ class ChatRunsController < ApplicationController
     authorize @chat_run.chat, :cancel_runs?
 
     if @chat_run.cancel!(cancelled_by: current_user.email)
-      render json: { status: 'cancelled' }, status: :ok
+      render json: { status: "cancelled" }, status: :ok
     else
-      render json: { error: 'Failed to cancel chat run' }, status: :unprocessable_content
+      render json: { error: "Failed to cancel chat run" }, status: :unprocessable_content
     end
   end
 
@@ -22,7 +22,7 @@ class ChatRunsController < ApplicationController
     authorize @chat_run.chat, :send_messages?
 
     unless @chat_run.status_awaiting_tasks?
-      render json: { error: 'Chat run is not awaiting tasks' }, status: :conflict
+      render json: { error: "Chat run is not awaiting tasks" }, status: :conflict
       return
     end
 
@@ -31,7 +31,7 @@ class ChatRunsController < ApplicationController
       return
     end
 
-    render json: { status: 'continuing' }, status: :ok
+    render json: { status: "continuing" }, status: :ok
   end
 
   def approve_tool

@@ -4,7 +4,7 @@ require 'rails_helper'
 
 RSpec.describe MemberContext, type: :model do
   # Contract test: documents what data the LLM receives when a Member is @mentioned
-  
+
   describe '.from_record' do
     let(:member) { members(:alice_team_member) }
     let(:context) { described_class.from_record(member) }
@@ -51,7 +51,7 @@ RSpec.describe MemberContext, type: :model do
     it 'returns human-readable summary' do
       member = members(:alice_team_member)
       context = described_class.from_record(member)
-      
+
       summary = context.summary
       expect(summary).to include(member.user.name)
       expect(summary).to include(member.workspace.name)
@@ -77,7 +77,7 @@ RSpec.describe MemberContext, type: :model do
 
     it 'exports valid JSON schema' do
       schema = context.to_json_schema
-      
+
       # Schema name represents the model, not the Context wrapper
       expect(schema[:name]).to eq('Member')
       expect(schema[:description]).to be_present
@@ -86,4 +86,3 @@ RSpec.describe MemberContext, type: :model do
     end
   end
 end
-

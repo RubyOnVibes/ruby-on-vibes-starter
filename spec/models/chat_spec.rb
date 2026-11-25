@@ -15,7 +15,7 @@ RSpec.describe Chat, type: :model do
       )
     end
     end
-    
+
   describe '#owner? / #member_exists? / #admin?' do
     it 'owner has full access' do
       chat = chats(:team_chat)
@@ -23,7 +23,7 @@ RSpec.describe Chat, type: :model do
       expect(chat.member_exists?(members(:alice_team_member))).to be true
       expect(chat.admin?(members(:alice_team_member))).to be true
       end
-      
+
     it 'participant has limited access' do
       chat = chats(:team_chat)
       expect(chat.owner?(members(:bob_team_member))).to be false
@@ -35,7 +35,7 @@ RSpec.describe Chat, type: :model do
       expect(chats(:team_chat).member_exists?(members(:bob_personal_member))).to be false
     end
   end
-  
+
   describe 'scopes' do
     it 'filters by member count' do
       expect(Chat.personal).to include(chats(:alice_personal_chat))
@@ -61,7 +61,7 @@ RSpec.describe Chat, type: :model do
         skip_llm_context: true
       )
 
-      messages = chat.messages.where(id: [normal_msg.id, skipped_msg.id])
+      messages = chat.messages.where(id: [ normal_msg.id, skipped_msg.id ])
       filtered = chat.order_messages_for_llm(messages)
 
       expect(filtered.map(&:id)).to include(normal_msg.id)

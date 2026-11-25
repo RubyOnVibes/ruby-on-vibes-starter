@@ -8,30 +8,30 @@ module Vibes
   module Api
     class ApiController < Vibes::Api::BaseController
       skip_before_action :authenticate_vibes_api, only: :health
-      
+
       def health
-        return render json: { status: 'ok' }, status: 200 unless ENV['USE_MOUNTED_VIBES'] == 'true'
-        
+        return render json: { status: "ok" }, status: 200 unless ENV["USE_MOUNTED_VIBES"] == "true"
+
         begin
-          commit = get_local_commit_hash_from_repo || 'unknown'
-          
+          commit = get_local_commit_hash_from_repo || "unknown"
+
           db_primary_ok = check_database(:primary)
           db_cache_ok = check_database(:cache)
           db_queue_ok = check_database(:queue)
-          
+
           all_databases_ready = db_primary_ok && db_cache_ok && db_queue_ok
-          bundle_ready = File.exist?('/mnt/data/bundle/.ready')
-          bundle_active = ENV['BUNDLE_PATH'] == '/mnt/data/bundle' && ENV['GEM_HOME'].include?('/mnt/data/bundle')
-          
+          bundle_ready = File.exist?("/mnt/data/bundle/.ready")
+          bundle_active = ENV["BUNDLE_PATH"] == "/mnt/data/bundle" && ENV["GEM_HOME"].include?("/mnt/data/bundle")
+
           # Include optional MCP (Model Context Protocol) info if enabled
-          health_data = { 
-            status: 'ok',
+          health_data = {
+            status: "ok",
             timestamp: Time.current.iso8601,
-            database: all_databases_ready ? 'connected' : 'disconnected',
+            database: all_databases_ready ? "connected" : "disconnected",
             databases: {
-              primary: db_primary_ok ? 'connected' : 'disconnected',
-              cache: db_cache_ok ? 'connected' : 'disconnected',
-              queue: db_queue_ok ? 'connected' : 'disconnected',
+              primary: db_primary_ok ? "connected" : "disconnected",
+              cache: db_cache_ok ? "connected" : "disconnected",
+              queue: db_queue_ok ? "connected" : "disconnected",
               all_ready: all_databases_ready
             },
             bundle: {
@@ -46,12 +46,12 @@ module Vibes
             },
             mcp: (Rails.application.config.tidewave&.mcp_info_for_health rescue nil)
           }
-          
+
           render json: health_data
         rescue => e
           Rails.logger.error "❌ Health check failed: #{e.message}"
-          render json: { 
-            status: 'error',
+          render json: {
+            status: "error",
             error: e.message,
             timestamp: Time.current.iso8601
           }, status: 503
@@ -67,10 +67,10 @@ module Vibes
 
           restart_ssr_if_needed # attempt to end node process running ssr.js & let vibes-server restart it with new bundle
 
-          render json: { 
-            success: true, 
-            message: "Hot reload completed", 
-            timestamp: Time.current.iso8601 
+          render json: {
+            success: true,
+            message: "Hot reload completed",
+            timestamp: Time.current.iso8601
           }
         rescue => e
           Rails.logger.error "❌ Hot reload failed: #{e.message}"
@@ -85,11 +85,11 @@ module Vibes
       def git_pull
         begin
           Rails.logger.info "📥 Git pull and sync triggered via API"
-          
-          code_repo_path = '/mnt/data/code'
-          
+
+          code_repo_path = "/mnt/data/code"
+
           # Step 1: Verify code repo exists (matches SSH script check)
-          unless Dir.exist?(File.join(code_repo_path, '.git'))
+          unless Dir.exist?(File.join(code_repo_path, ".git"))
             Rails.logger.error "❌ Code repo not initialized"
             render json: { success: false, error: "Code repo not initialized" }, status: 500
             return
@@ -97,7 +97,7 @@ module Vibes
 
           # Ensure safe.directory is configured
           `git config --global --add safe.directory /mnt/data/code 2>/dev/null`
-          
+
           # CRITICAL: Ensure code repo is owned by rails user (fixes permission denied on .git/FETCH_HEAD)
           # SSH operations run as root and may create root-owned files in .git/
           # API runs as rails user and needs write access
@@ -107,21 +107,21 @@ module Vibes
           unless $?.success?
             Rails.logger.warn "⚠️ Ownership fix failed (non-critical): #{chown_output}"
           end
-      
+
           # Step 2: Get current state (thread-safe with -C flag)
           current_commit = `git -C #{Shellwords.escape(code_repo_path)} rev-parse HEAD 2>/dev/null`.strip
           remote_url = `git -C #{Shellwords.escape(code_repo_path)} remote get-url origin 2>/dev/null`.strip
-          
+
           Rails.logger.info "Current commit: #{current_commit}"
           Rails.logger.info "Remote URL: #{remote_url.gsub(/:.*@/, ':***@')}" # Mask credentials
-          
+
           # Verify remote is configured (matches SSH script check)
           if remote_url.empty?
             Rails.logger.error "❌ Git remote not configured!"
             render json: { success: false, error: "Git remote not configured" }, status: 500
             return
           end
-          
+
           # Step 3: FORCE CLEAN working tree before pulling
           # CRITICAL: Discard ALL local changes (bundle install creates dirty Gemfile.lock, schema dumps modify files)
           # Gitea is source of truth - we don't preserve any local modifications
@@ -166,16 +166,16 @@ module Vibes
           end
 
           Rails.logger.info "✅ Synced with Gitea"
-                                        
+
           # Step 4: Get final commit hash (thread-safe with -C flag)
           new_commit = `git -C #{Shellwords.escape(code_repo_path)} rev-parse HEAD`.strip
           Rails.logger.info "New commit: #{new_commit}"
-          
+
           # Step 5: Write REVISION file (matches SSH script)
-          File.write('/mnt/data/code/REVISION', new_commit)
-          
+          File.write("/mnt/data/code/REVISION", new_commit)
+
           Rails.logger.info "✅ Git pull and sync completed successfully"
-          
+
           render json: {
             success: true,
             commit_hash: new_commit,
@@ -266,24 +266,24 @@ module Vibes
       end
 
       def get_local_commit_hash_from_repo
-        code_root = Pathname.new('/mnt/data/code')
-        git_dir = code_root.join('.git')
+        code_root = Pathname.new("/mnt/data/code")
+        git_dir = code_root.join(".git")
         return nil unless Dir.exist?(git_dir)
 
         result = `git -C #{Shellwords.escape(code_root.to_s)} rev-parse HEAD 2>/dev/null`.strip
-        result.present? && result != 'HEAD' ? result : nil
+        result.present? && result != "HEAD" ? result : nil
       rescue => e
         Rails.logger.warn "⚠️ Failed to get code repo commit hash: #{e.message}"
         nil
       end
 
       def get_fly_image_from_toml
-        fly_toml_path = Pathname.new('/mnt/data/code/fly.toml')
+        fly_toml_path = Pathname.new("/mnt/data/code/fly.toml")
         return nil unless File.exist?(fly_toml_path)
 
         File.readlines(fly_toml_path).each do |line|
           if line =~ /^\s*image\s*=\s*"([^"]+)"/
-            return $1.split(':').last
+            return $1.split(":").last
           end
         end
 
@@ -296,21 +296,21 @@ module Vibes
       # Restart SSR server if new bundle exists (hot code update)
       # SSR is a Node.js process with old bundle in memory - must restart to pick up changes
       def restart_ssr_if_needed
-        ssr_bundle = '/mnt/data/code/vite/ssr/ssr.js'
+        ssr_bundle = "/mnt/data/code/vite/ssr/ssr.js"
         return unless File.exist?(ssr_bundle)
-        
+
         begin
           Rails.logger.info "🔮 Restarting SSR server to load new bundle..."
           pids = `pgrep -f 'node.*ssr\.js'`.strip.split("\n") # Find SSR process (node running ssr.js)
-          
+
           if pids.any?
             pids.each do |pid|
               Rails.logger.info "  Killing SSR process: #{pid}"
-              Process.kill('TERM', pid.to_i)
+              Process.kill("TERM", pid.to_i)
             end
-            
+
             sleep 0.5 # Wait for graceful shutdown
-            
+
             # bin/vibes-server will auto-restart SSR (handled by trap/wait loop)
             Rails.logger.info "✅ SSR process killed, will auto-restart with new bundle"
           else
@@ -322,19 +322,19 @@ module Vibes
       end
 
       def code_repo_state
-        if Dir.exist?('/mnt/data/code/.git')
+        if Dir.exist?("/mnt/data/code/.git")
           status = `git -C /mnt/data/code status --porcelain 2>/dev/null`
-          status.present? ? 'dirty' : 'clean'
+          status.present? ? "dirty" : "clean"
         else
-          'missing'
+          "missing"
         end
       rescue => e
-        'unknown'
+        "unknown"
       end
 
       def code_repo_safe
         safe_dirs = `git config --global --get-all safe.directory 2>/dev/null`.to_s.lines.map(&:strip)
-        safe_dirs.include?('/mnt/data/code')
+        safe_dirs.include?("/mnt/data/code")
       rescue => e
         false
       end

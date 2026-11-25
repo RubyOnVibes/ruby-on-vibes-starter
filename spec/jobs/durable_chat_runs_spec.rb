@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require "rails_helper"
 require "ruby_llm/test_helper"
 
@@ -37,7 +38,7 @@ RSpec.describe "Durable chat execution", type: :job do
       end
     end
     stub_const("DurableDocumentTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([DurableDocumentTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ DurableDocumentTool ])
     stub_replies tool_call(:durable_document), "The document is ready.", cost: 0.01
     run = new_run
     ChatStreamJob.perform_now(run.id)
@@ -48,8 +49,8 @@ RSpec.describe "Durable chat execution", type: :job do
     ChatStreamJob.perform_now(run.id)
     ChatStreamJob.perform_now(run.id) # duplicate delivery after completion
     expect(run.reload).to be_status_completed
-    expect(executed).to eq([:started])
-    expect(resumed).to eq(["invoice"])
+    expect(executed).to eq([ :started ])
+    expect(resumed).to eq([ "invoice" ])
     expect(chat.messages.where(role: :user).count).to eq(1)
     expect(chat.messages.where(role: :tool).sole.content).to eq("Document processed")
     expect(run.owned_llm_usages.count).to eq(2)
@@ -126,7 +127,7 @@ RSpec.describe "Durable chat execution", type: :job do
       def resume(task, **) = task
     end
     stub_const("SignatureWaitTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([SignatureWaitTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ SignatureWaitTool ])
     stub_replies tool_call(:signature_wait)
     run = new_run
     ChatStreamJob.perform_now(run.id)
@@ -140,7 +141,7 @@ RSpec.describe "Durable chat execution", type: :job do
 
   it "preserves completed tool effects when cancelled" do
     stub_replies tool_call(Examples::RenameChatTool.tool_name, title: "Kept title"), "Done."
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([Examples::RenameChatTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ Examples::RenameChatTool ])
     run = new_run
     ChatStreamJob.perform_now(run.id)
     run.answer_question!(run.pending_questions.sole.id, member: member, decision: "approved")

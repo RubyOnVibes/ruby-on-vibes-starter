@@ -2,7 +2,7 @@ class AddMentionableToMentions < ActiveRecord::Migration[8.1]
   def up
     # Add mentionable_id as nullable first
     add_column :mentions, :mentionable_id, :integer
-    
+
     # Populate from sgid using Ruby
     reversible do |dir|
       dir.up do
@@ -17,14 +17,14 @@ class AddMentionableToMentions < ActiveRecord::Migration[8.1]
         end
       end
     end
-    
+
     # Now make it NOT NULL
     change_column_null :mentions, :mentionable_id, false
-    add_index :mentions, [:mentionable_type, :mentionable_id]
+    add_index :mentions, [ :mentionable_type, :mentionable_id ]
   end
-  
+
   def down
-    remove_index :mentions, [:mentionable_type, :mentionable_id]
+    remove_index :mentions, [ :mentionable_type, :mentionable_id ]
     remove_column :mentions, :mentionable_id
   end
 end

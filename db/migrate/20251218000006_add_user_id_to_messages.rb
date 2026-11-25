@@ -3,7 +3,7 @@
 class AddUserIdToMessages < ActiveRecord::Migration[8.1]
   def change
     add_reference :messages, :user, null: true, foreign_key: true, index: true
-    
+
     # Backfill user_id for existing user_submitted messages
     # Match message.chat.member.user_id
     reversible do |dir|

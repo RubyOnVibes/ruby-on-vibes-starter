@@ -2,7 +2,7 @@
 # AsyncQueueJob - A job that runs on the async_job queue
 # This job is used to test the async_job adapter
 # You may inherit from this job in your own jobs to run on the async_job queue
-# 
+#
 class AsyncQueueJob < ApplicationJob
   self.queue_adapter = :async_job
 

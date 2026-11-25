@@ -16,10 +16,10 @@ module RubyOnVibes
     config_mutex.synchronize do
       @config = nil  # Clear memoization
       @config = Configuration.new  # Force fresh load from YAML
-      
+
       # Sync all cached configs in gems/frameworks that don't read dynamically
       sync_all_dependent_configs!
-      
+
       Rails.logger.info "✅ RubyOnVibes configuration reloaded from vibes.yml"
     end
     true
@@ -27,30 +27,30 @@ module RubyOnVibes
     Rails.logger.error "❌ Failed to reload RubyOnVibes config: #{e.message}"
     false
   end
-  
+
   private
-  
+
   # Lazy-initialized mutex for thread-safe config reloading
 
   # Lazy-initialized mutex — one per process (works with Falcon's fiber model too)
   def self.config_mutex
     @config_mutex ||= Mutex.new
   end
-  
+
   public
-  
+
   # ========================================
   # DEPENDENT CONFIG SYNC (Single Source of Truth)
   # ========================================
   # These methods sync RubyOnVibes config to gems/frameworks that cache values at boot.
   # Each initializer calls its specific sync method, and hot reload calls sync_all.
-  
+
   # Sync Pay gem configuration
   # Called from: config/initializers/pay.rb and during hot reload
   #
   def self.sync_pay_config!
     return unless defined?(Pay)
-    
+
     Pay.business_name = business_name
     Pay.business_address = business_address
     Pay.application_name = application_name
@@ -58,12 +58,12 @@ module RubyOnVibes
   rescue => e
     Rails.logger.debug "Pay config sync failed: #{e.message}"
   end
-  
+
   # Sync ActionMailer configuration for production
   # Called from: config/environments/production.rb (at boot) and during hot reload
   def self.sync_action_mailer_config!
     return unless defined?(Rails) && Rails.application.config.respond_to?(:action_mailer)
-    
+
     # Set both host and protocol (production uses HTTPS)
     Rails.application.config.action_mailer.default_url_options = {
       host: mailer_host,
@@ -72,12 +72,12 @@ module RubyOnVibes
   rescue => e
     Rails.logger.debug "ActionMailer config sync failed: #{e.message}"
   end
-  
+
   # Sync ActionMailer configuration for test environment
   # Called from: config/environments/test.rb (at boot)
   def self.sync_action_mailer_config_test!
     return unless defined?(Rails) && Rails.application.config.respond_to?(:action_mailer)
-    
+
     # Test environment uses HTTP only
     Rails.application.config.action_mailer.default_url_options = {
       host: mailer_host
@@ -85,7 +85,7 @@ module RubyOnVibes
   rescue => e
     Rails.logger.debug "ActionMailer test config sync failed: #{e.message}"
   end
-  
+
   # Sync all dependent configs (called during hot reload in production)
   def self.sync_all_dependent_configs!
     sync_pay_config!
@@ -155,9 +155,9 @@ module RubyOnVibes
 
   # True when RubyLLM is enabled
   def self.llm?
-    return false if ENV['LLMS_ENABLED'] == 'false'
-    return true if ENV['LLMS_ENABLED'] == 'true' # allows dev env override for rapid template iteration
-    
+    return false if ENV["LLMS_ENABLED"] == "false"
+    return true if ENV["LLMS_ENABLED"] == "true" # allows dev env override for rapid template iteration
+
     proxy_enabled = true # Ada, Claude (agents) etc. — LLM features enabled by default via platform proxy — change to false to disable for apps with no AI component.
     proxied = proxy_enabled && ENV["USE_MOUNTED_VIBES"] == "true" && ENV["VIBES_AI_PROXY_URL"].present?
 
@@ -166,10 +166,10 @@ module RubyOnVibes
     # fallback to local keys if proxy is not enabled
     anthropic_key = RubyLLM.config.anthropic_api_key
     openai_key    = RubyLLM.config.openai_api_key
-    
+
     anthropic_key.present? || openai_key.present?
   end
-  
+
   # Chat visibility and persistent automation can be configured independently.
 
   def self.chat?
@@ -177,7 +177,7 @@ module RubyOnVibes
   end
 
   def self.agents?
-    return true if ENV['AGENTS_ENABLED'] == 'true' # dev override for rapid template iteration
+    return true if ENV["AGENTS_ENABLED"] == "true" # dev override for rapid template iteration
 
     agents_enabled = true # Persistent agents (Manager, webhooks, scheduled runs) — change to false for apps with no agent component.
     agents_enabled && chat?
@@ -191,12 +191,12 @@ module RubyOnVibes
 
   # Email provider detection helpers
   # These determine which email system to default to based on environment configuration
-  
+
   # Resend (production email provider) is enabled when API key is configured
   # Used for: sending real transactional emails to users.
   # Use this in production after verifying your domain on resend.com.
   def self.resend?
-    ENV['RESEND_API_KEY'].present?
+    ENV["RESEND_API_KEY"].present?
   end
 
   # Mailbin (dev/staging email capture) is enabled when:
@@ -204,6 +204,6 @@ module RubyOnVibes
   # 2. Resend is NOT configured (no API key)
   # Used for: capturing emails locally or in staging environments for testing without sending real emails
   def self.mailbin?
-    ENV['USE_MOUNTED_VIBES'] == 'true' && !resend?
+    ENV["USE_MOUNTED_VIBES"] == "true" && !resend?
   end
 end

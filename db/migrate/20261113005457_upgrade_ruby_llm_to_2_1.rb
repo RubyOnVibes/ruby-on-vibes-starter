@@ -39,7 +39,7 @@ class UpgradeRubyLlmTo21 < ActiveRecord::Migration[8.1]
     reversible do |direction|
       direction.up do
         operations = check_constraints(:ruby_llm_usages).find { |constraint| constraint.expression.include?("operation") }
-        if operations && ['chat', 'embedding', 'moderation', 'image', 'speech', 'transcription', 'ocr', 'rerank', 'judgment', 'video', 'research'].any? { |operation| !operations.expression.include?("'#{operation}'") }
+        if operations && [ 'chat', 'embedding', 'moderation', 'image', 'speech', 'transcription', 'ocr', 'rerank', 'judgment', 'video', 'research' ].any? { |operation| !operations.expression.include?("'#{operation}'") }
           remove_check_constraint :ruby_llm_usages, name: operations.name
           add_check_constraint :ruby_llm_usages, "operation IN ('chat', 'embedding', 'moderation', 'image', 'speech', 'transcription', 'ocr', 'rerank', 'judgment', 'video', 'research')"
         end

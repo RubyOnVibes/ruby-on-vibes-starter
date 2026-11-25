@@ -9,7 +9,7 @@
 class Chats::MembersController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat
-  
+
   ##
   # GET /chats/:chat_id/members
   # List all members in the chat with org context
@@ -19,7 +19,7 @@ class Chats::MembersController < ApplicationController
     authorize @chat, :show?
 
     @members = @chat.chat_members
-      .includes(member: [:user, :workspace])
+      .includes(member: [ :user, :workspace ])
       .order(created_at: :asc)
 
     render json: @members.map { |cm| serialize_chat_member(cm) }
@@ -36,7 +36,7 @@ class Chats::MembersController < ApplicationController
 
     # Can't remove owner (policy-level check would be better, but this is explicit)
     if @chat_member.role_owner?
-      render json: { error: 'Cannot remove chat owner' }, status: :forbidden
+      render json: { error: "Cannot remove chat owner" }, status: :forbidden
       return
     end
 
@@ -44,17 +44,17 @@ class Chats::MembersController < ApplicationController
 
     render json: { success: true }
   end
-  
+
   private
-  
+
   def set_chat
     @chat = current_member.chats.find_by_prefix_id(params[:chat_id])
-    
+
     unless @chat
-      render json: { error: 'Chat not found' }, status: :not_found
+      render json: { error: "Chat not found" }, status: :not_found
     end
   end
-  
+
   def serialize_chat_member(cm)
     {
       id: cm.id,
@@ -63,7 +63,7 @@ class Chats::MembersController < ApplicationController
       userAvatar: cm.member.user.avatar_url,
       orgId: cm.member.workspace.to_param,
       orgName: cm.member.workspace.name,
-      orgType: cm.member.workspace.personal? ? 'Personal' : 'Team',
+      orgType: cm.member.workspace.personal? ? "Personal" : "Team",
       role: cm.role,
       isOwner: cm.role_owner?,
       joinedAt: cm.created_at.iso8601

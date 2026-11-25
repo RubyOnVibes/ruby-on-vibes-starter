@@ -24,7 +24,7 @@ class AgentDelivery < ApplicationRecord
 
   def self.accept!(agent:, trigger:, payload: "", event_type: nil, idempotency_key: nil)
     key = idempotency_key.presence
-    digest = Digest::SHA256.hexdigest([event_type, payload].to_json)
+    digest = Digest::SHA256.hexdigest([ event_type, payload ].to_json)
     attributes = {
       chat: agent.chat, initiated_by_member: agent.member, payload: payload,
       event_type: event_type, payload_digest: digest

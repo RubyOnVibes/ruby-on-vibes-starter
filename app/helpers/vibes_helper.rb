@@ -14,18 +14,18 @@ module VibesHelper
       surface_1: "248 250 252",
       surface_2: "241 245 249",
       surface_3: "226 232 240",
-      
+
       # Text colors - text_2 is muted/secondary text (Slate 600 for better contrast)
       text_1: "15 23 42",
       text_2: "71 85 105",
-      
+
       # Brand colors - CUSTOMIZE THESE for your brand
       brand: "30 64 175",  # Primary brand color
       brand_contrast: "255 255 255",
       accent: "238 242 255",
       secondary: "241 245 249",
       danger: "225 29 72",
-      
+
       # Status colors
       info: "59 130 246",
       info_contrast: "255 255 255",
@@ -42,7 +42,7 @@ module VibesHelper
       chart_5: "236 72 153"
     }
   end
-  
+
   # Design tokens for dark mode
   # Customize dark mode appearance separately from light mode
   def vibes_tokens_dark
@@ -56,11 +56,11 @@ module VibesHelper
       surface_1: "15 23 42",
       surface_2: "30 41 59",
       surface_3: "51 65 85",
-      
+
       # Text colors (lighter for dark backgrounds - Slate 300 for better contrast)
       text_1: "226 232 240",
       text_2: "203 213 225",
-      
+
       # Brand colors - often inverted for dark mode
       brand: "255 255 255",  # White brand in dark mode
       brand_contrast: "2 6 23",  # Dark text on white brand
@@ -76,14 +76,14 @@ module VibesHelper
       chart_5: "244 114 182"
     }
   end
-  
+
   # Check if we're rendering in a mailer context (no CSP nonces available)
   def in_mailer_context?
     !respond_to?(:content_security_policy_nonce)
   rescue
     true
   end
-  
+
   # Safe nonce attribute - only renders in web context
   def safe_nonce_attr
     return "" if in_mailer_context?
@@ -92,7 +92,7 @@ module VibesHelper
 
   def user_data_attrs
     return "null" unless current_user  # JSON null, not empty object (which is truthy in JS)
-    
+
     { id: current_user.to_param,  # Use prefix_id for consistency
       username: current_user.username,
       email: current_user.email,
@@ -202,7 +202,7 @@ module VibesHelper
   rescue
     "/profile/password/edit"
   end
-  
+
   # Safe wrapper for hotwire_native_app? helper (may not exist in all contexts)
   def hotwire_native_app_safe?
     return false unless respond_to?(:hotwire_native_app?)
@@ -222,7 +222,7 @@ module VibesHelper
       membersCount: current_workspace.members_count
     }
   end
-  
+
   def current_member_attrs
     return nil unless current_member
     {
@@ -237,14 +237,14 @@ module VibesHelper
     defined?(controller_path) &&
       controller_path&.start_with?("authentication/")
   end
-  
+
   # Email-safe inline button styles
   # Use this for links in email templates to ensure consistent, reliable button styling
   # Example: <%= link_to "Click Me", url, style: email_button_style(:primary) %>
   def email_button_style(variant = :primary)
     tokens = vibes_tokens
     base = "display:inline-block;padding:12px 32px;font-size:15px;font-weight:600;text-decoration:none;border-radius:6px;text-align:center;"
-    
+
     case variant
     when :primary
       "#{base}background-color:rgb(#{tokens[:brand]});color:rgb(#{tokens[:brand_contrast]});"
@@ -254,5 +254,4 @@ module VibesHelper
       base
     end
   end
-
 end

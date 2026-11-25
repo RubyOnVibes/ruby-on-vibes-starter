@@ -24,11 +24,11 @@ class Chat < ApplicationRecord
     filtered = messages.reject do |msg|
       next true if msg.skip_llm_context?
       next true if msg.compacted?
-      next false if msg.role.to_s == 'system'
+      next false if msg.role.to_s == "system"
       next false if msg.content.present?
-      next false if msg.role.to_s == 'user' && msg.attachments.attached?
-      next false if msg.role.to_s == 'tool'
-      next false if msg.role.to_s == 'assistant' && msg.ruby_llm_tool_calls.exists?
+      next false if msg.role.to_s == "user" && msg.attachments.attached?
+      next false if msg.role.to_s == "tool"
+      next false if msg.role.to_s == "assistant" && msg.ruby_llm_tool_calls.exists?
       true
     end
 
@@ -72,35 +72,35 @@ class Chat < ApplicationRecord
 
   # Validate owner exists in chat_members
   validate :owner_must_be_chat_member, on: :update, if: :member_id_changed?
-  
+
   # Scopes for filtering by member count
   scope :personal, -> { where(has_multiple_members: false) }
   scope :with_multiple_members, -> { where(has_multiple_members: true) }
-  
+
   def self.show_tool_calls_in_ui?
     true  # Default: show tool calls
   end
-  
+
   # Convenience accessors
   def user
     member.user
   end
-  
+
   def workspace
     member.workspace
   end
-  
+
   ##
   # Authorization helpers
   #
   def owner?(m)
     member_id == m.id
   end
-  
+
   def member_exists?(m)
     chat_members.exists?(member_id: m.id)
   end
-  
+
   # Shared mention policy for admission and later model hydration. Participation
   # grants member/workspace context across a group chat, but another chat must
   # still be accessible to the current actor. New types require explicit policy.
@@ -127,25 +127,25 @@ class Chat < ApplicationRecord
   def admin?(m)
     owner?(m)  # For now, only owner is admin
   end
-  
+
   ##
   # Chat type helpers
   #
   def personal?
     !has_multiple_members
   end
-  
+
   def group?
     has_multiple_members
   end
-  
+
   ##
   # Get the owner ChatMember record
   #
   def owner_chat_member
     chat_members.role_owner.first
   end
-  
+
   ##
   # Invite a member to this chat
   # Accepts member prefix_id (mbr_xxx) or numeric ID
@@ -155,32 +155,32 @@ class Chat < ApplicationRecord
   # @return [ChatInvitation] The created invitation
   #
   def invite_member(member_id:, inviter:)
-    invitee = if member_id.to_s.start_with?('mbr_')
+    invitee = if member_id.to_s.start_with?("mbr_")
       Member.find_by_prefix_id(member_id)
     else
       Member.find(member_id)
     end
-    
+
     raise ActiveRecord::RecordNotFound, "Member #{member_id} not found" unless invitee
-    
+
     chat_invitations.create!(
       invitee: invitee,
       inviter: inviter
     )
   end
-  
+
   ##
   # Check if member has a pending invitation
   #
   def pending_invitation_for?(member)
     chat_invitations.status_pending.exists?(invitee: member)
   end
-  
+
   # Override mentionable_label
   def mentionable_label
     name.presence || "Chat ##{id}"
   end
-  
+
   ##
   # LLM-friendly summary
   # Keep concise for token efficiency (aim for <20 tokens)
@@ -189,15 +189,15 @@ class Chat < ApplicationRecord
     parts = []
     parts << "titled '#{name}'" if name.present?
     parts << "#{messages.count} messages"
-    
+
     "Chat #{parts.join(', ')}"
   end
-  
+
   # Auto-generate name with timestamp
   before_validation :generate_name_from_timestamp, if: -> { name.blank? }, on: :create
-  
+
   private
-  
+
   def purpose_is_fixed_during_work
     if persisted? && will_save_change_to_purpose? && (chat_runs.active.exists? || pending_tasks.any? || pending_questions.any?)
       errors.add(:purpose, "cannot change while work is pending")
@@ -206,20 +206,20 @@ class Chat < ApplicationRecord
 
   def generate_name_from_timestamp
     return if name.present?
-    
+
     # Generate human-readable timestamp: "Chat Nov 27 3:45pm"
-    time = Time.current.in_time_zone(member.user.time_zone || 'UTC')
-    timestamp = time.strftime("%b %d %l:%M%P").gsub(/\s+/, ' ').strip
+    time = Time.current.in_time_zone(member.user.time_zone || "UTC")
+    timestamp = time.strftime("%b %d %l:%M%P").gsub(/\s+/, " ").strip
     self.name = "Chat #{timestamp}"
   end
-  
+
   ##
   # Callback: Add creator as owner in chat_members on creation
   # This ensures the owner is always a participant
   #
   def add_creator_as_owner
     return unless member_id.present?
-    
+
     owner_chat_member
   rescue ActiveRecord::RecordInvalid => e
     # If owner already exists (e.g., from backfill), ignore
@@ -228,20 +228,20 @@ class Chat < ApplicationRecord
 
   def owner_chat_member
     return unless member_id.present?
-    
+
     chat_members.find_or_create_by!(
       member_id: member_id,
       role: :owner
     )
   end
-  
+
   ##
   # Validation: Owner must exist in chat_members
   # Prevents orphaning a chat by changing member_id to someone not in members
   #
   def owner_must_be_chat_member
     return unless persisted? && member_id.present?
-    
+
     unless chat_members.exists?(member_id: member_id)
       errors.add(:member_id, "must be a chat member")
     end

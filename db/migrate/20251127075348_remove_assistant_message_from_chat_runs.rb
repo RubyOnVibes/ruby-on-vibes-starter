@@ -17,4 +17,3 @@ class RemoveAssistantMessageFromChatRuns < ActiveRecord::Migration[8.0]
     remove_reference :chat_runs, :assistant_message, foreign_key: { to_table: :messages } if column_exists?(:chat_runs, :assistant_message_id)
   end
 end
-

@@ -22,7 +22,7 @@ end
 Rails.configuration.to_prepare do
   # Called at boot and on every code reload (development auto-reload + hot reload)
   RubyOnVibes.sync_pay_config! if defined?(RubyOnVibes)
-  
+
   Receipts.default_font = {
     bold: Rails.root.join("app/assets/fonts/Inter-Bold.ttf"),
     normal: Rails.root.join("app/assets/fonts/Inter-Regular.ttf")

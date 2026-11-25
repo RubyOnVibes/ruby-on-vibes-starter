@@ -88,7 +88,7 @@ module MultitenancyHelper
 
     # Team workspace with uploaded avatar
     if workspace.avatar.attached? && workspace.avatar.variable?
-      return workspace.avatar.variant(resize_to_fit: [pixel_size, pixel_size])
+      return workspace.avatar.variant(resize_to_fit: [ pixel_size, pixel_size ])
     end
 
     # Fallback to initials-based avatar
@@ -102,4 +102,3 @@ module MultitenancyHelper
     workspace.owner_id == member.user_id
   end
 end
-

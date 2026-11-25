@@ -1,8 +1,8 @@
 class WorkspacesController < Workspaces::BaseController
   before_action :authenticate_user!
-  before_action :set_workspace, only: [:show, :edit, :update, :destroy, :start_session]
-  before_action :prevent_personal_workspace_deletion, only: [:destroy]
-  before_action :ensure_teams_enabled, except: [:index, :show]
+  before_action :set_workspace, only: [ :show, :edit, :update, :destroy, :start_session ]
+  before_action :prevent_personal_workspace_deletion, only: [ :destroy ]
+  before_action :ensure_teams_enabled, except: [ :index, :show ]
 
   def index
     @pagy, @workspaces = pagy(current_user.workspaces)
@@ -70,7 +70,7 @@ class WorkspacesController < Workspaces::BaseController
   end
 
   def workspace_params
-    params.expect(workspace: [:avatar, :name])
+    params.expect(workspace: [ :avatar, :name ])
   end
 
   def prevent_personal_workspace_deletion

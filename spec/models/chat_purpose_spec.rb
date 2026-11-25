@@ -17,7 +17,7 @@ RSpec.describe ChatPurpose do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_action_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_stream_to)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([CurrentDateTimeTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ CurrentDateTimeTool ])
   end
 
   def bind
@@ -109,7 +109,7 @@ RSpec.describe ChatPurpose do
     configured = described_class.bind(chat: chat, run: run, user_message: input)
     native_input = configured.to_llm.messages.find { |item| item.role == :user }
     expect(native_input).to be_present
-    expect(native_input.attachments.map(&:filename)).to eq(["document.txt"])
+    expect(native_input.attachments.map(&:filename)).to eq([ "document.txt" ])
     configured.complete
 
     expect(chat.messages.where(role: :assistant).last.content).to eq("Read the document.")

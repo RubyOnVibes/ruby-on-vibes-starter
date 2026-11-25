@@ -1,6 +1,6 @@
 class ActiveStorage::AttachmentResource < Madmin::Resource
   menu parent: "Resources", position: 2
-  
+
   # Attributes
   attribute :id, form: false
   attribute :name

@@ -23,11 +23,11 @@ class CurrentDateTimeTool < RubyLLM::Tool
   # @param sender_user [User] The user who sent the message
   # @param sender_member [Member] The user's member record who sent the message
   # @param sender_workspace [Workspace] The workspace the sender is in
-  # 
+  #
   # NOTE: This is an example tool.
   # The following parameters are not required for all tools, but it is good practice to include them for consistency.
   # When dealing with multiple members and multiple workspaces, it is important to know the context of the message and the chat.
-  # 
+  #
   def initialize(chat:, sender_user: nil, sender_member: nil, sender_workspace: nil)
     @chat = chat
     @chat_workspace = chat.workspace

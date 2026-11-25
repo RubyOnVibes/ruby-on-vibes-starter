@@ -6,4 +6,3 @@ class AddNameToChats < ActiveRecord::Migration[8.0]
     add_index :chats, :name
   end
 end
-

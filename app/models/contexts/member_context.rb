@@ -18,7 +18,7 @@ class MemberContext < RecordContext
     object :workspace, description: "Workspace this member belongs to" do
       string :id, description: "Workspace ID"
       string :name, description: "Workspace name"
-      string :type, enum: ['personal', 'team']
+      string :type, enum: [ "personal", "team" ]
     end
 
     array :roles,
@@ -44,13 +44,13 @@ class MemberContext < RecordContext
       workspace: {
         id: member.workspace.to_param,
         name: member.workspace.name,
-        type: member.workspace.personal? ? 'personal' : 'team'
+        type: member.workspace.personal? ? "personal" : "team"
       },
       roles: member.active_roles.map(&:to_s),
       is_owner: member.workspace_owner?
     )
   end
-  
+
   ##
   # Generate human-readable summary
   # Used for inline mentions and logging
@@ -58,10 +58,9 @@ class MemberContext < RecordContext
   def summary
     name = data[:name]
     org_name = data[:workspace][:name]
-    roles_text = data[:roles].join(', ')
-    owner_text = data[:is_owner] ? ' (Owner)' : ''
+    roles_text = data[:roles].join(", ")
+    owner_text = data[:is_owner] ? " (Owner)" : ""
 
     "#{name} in #{org_name} [#{roles_text}]#{owner_text}"
   end
 end
-

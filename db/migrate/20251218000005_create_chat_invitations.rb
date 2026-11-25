@@ -13,9 +13,9 @@ class CreateChatInvitations < ActiveRecord::Migration[8.1]
     end
 
     # Ensure each member can only be invited once per chat
-    add_index :chat_invitations, [:chat_id, :invitee_id], unique: true
-    
+    add_index :chat_invitations, [ :chat_id, :invitee_id ], unique: true
+
     # Fast filtering by status
-    add_index :chat_invitations, [:status, :invitee_id]
+    add_index :chat_invitations, [ :status, :invitee_id ]
   end
 end

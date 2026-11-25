@@ -12,17 +12,17 @@ module Madmin
     class << self
       # Wrap infer_type to handle missing database/tables gracefully
       alias_method :original_infer_type, :infer_type
-      
+
       def infer_type(name)
         # Check if database exists by looking for actual database file (not marker)
-        db_not_ready = if ENV['USE_MOUNTED_VIBES'] == 'true'
+        db_not_ready = if ENV["USE_MOUNTED_VIBES"] == "true"
           !File.exist?("/mnt/data/sqlite/production.sqlite3")
-        elsif ENV['RENDER_DISK_PATH']
+        elsif ENV["RENDER_DISK_PATH"]
           !File.exist?("#{ENV['RENDER_DISK_PATH']}/sqlite/production.sqlite3")
         else
           false  # Assume database exists or will be created
         end
-        
+
         if db_not_ready
           :string # Allow madmin to boot even if database isn't ready
         else

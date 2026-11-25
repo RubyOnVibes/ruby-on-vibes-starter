@@ -48,17 +48,17 @@ Rails.application.configure do
 
   # Allow iframe embedding in development (for Ruby on Vibes preview)
   config.force_ssl = false
-  config.action_dispatch.default_headers.delete('X-Frame-Options')
+  config.action_dispatch.default_headers.delete("X-Frame-Options")
 
   # Set localhost to be used by links generated in mailer templates.
   web_port = ENV.fetch("WEB_PORT") { ENV.fetch("PORT", 3000) }.to_i
-  config.action_mailer.default_url_options = {host: "localhost", port: web_port}
+  config.action_mailer.default_url_options = { host: "localhost", port: web_port }
 
   # Set default URL options for route helpers (used in jobs, etc.)
-  Rails.application.routes.default_url_options = {host: "localhost", port: web_port}
+  Rails.application.routes.default_url_options = { host: "localhost", port: web_port }
 
   config.action_mailer.delivery_method = :mailbin
-  
+
   config.action_mailer.perform_deliveries = true
 
   # Print deprecation notices to the Rails logger.

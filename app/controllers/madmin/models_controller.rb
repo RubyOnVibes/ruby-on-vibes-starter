@@ -1,6 +1,5 @@
 module Madmin
   class ModelsController < Madmin::ResourceController
-
     private
 
     # Add support for features array

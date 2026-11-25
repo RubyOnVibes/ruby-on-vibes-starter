@@ -16,7 +16,7 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_action_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_stream_to)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([Examples::RenameChatTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ Examples::RenameChatTool ])
   end
 
   def start_run(content: "Rename this chat", automated: false)
@@ -42,15 +42,15 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
       define_method(:execute) { executions << :performed; "Done" }
     end
     stub_const("BoundedWorkTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([BoundedWorkTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ BoundedWorkTool ])
     allow(Rails.configuration.x.llm).to receive(:tool_options).and_return(rounds: 2, calls: 2)
     stub_replies tool_call(:bounded_work), tool_call(:bounded_work), "This must not be requested", cost: 0.01
 
     run = start_run(content: "Keep working")
 
     expect(run).to be_status_failed
-    expect(executions).to eq([:performed, :performed])
-    expect(chat.messages.where(role: :tool).pluck(:content)).to eq(["Done", "Done"])
+    expect(executions).to eq([ :performed, :performed ])
+    expect(chat.messages.where(role: :tool).pluck(:content)).to eq([ "Done", "Done" ])
     expect(chat.messages.where(role: :assistant).last.content).to include("tool limit")
     expect(run.llm_attempts).to eq(2)
     expect(run.total_cost).to eq(BigDecimal("0.02"))
@@ -80,7 +80,7 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
       define_method(:execute) { executions << :performed; "Done" }
     end
     stub_const("CappedWorkTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([CappedWorkTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ CappedWorkTool ])
     allow(Rails.configuration.x.llm).to receive(:tool_options).and_return(rounds: 2, calls: 2)
     calls = Array.new(3) { tool_call(:capped_work) }
     stub_replies calls.first, "The allowed work is done."
@@ -92,9 +92,9 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
     run = start_run(content: "Do three units of work")
 
     expect(run).to be_status_completed
-    expect(executions).to eq([:performed, :performed])
+    expect(executions).to eq([ :performed, :performed ])
     results = chat.messages.where(role: :tool).order(:id).to_a
-    expect(results.first(2).map(&:content)).to eq(["Done", "Done"])
+    expect(results.first(2).map(&:content)).to eq([ "Done", "Done" ])
     expect(results.last.to_llm.tool_error_message).to be_present
     expect(run.pending_questions).to be_empty
     expect(chat.messages.where(role: :assistant).last.content).to eq("The allowed work is done.")
@@ -144,7 +144,7 @@ RSpec.describe "Chat streaming with RubyLLM 2.2", type: :job do
       end
     end
     stub_const("ReportFormatTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ReportFormatTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ ReportFormatTool ])
     stub_replies tool_call(:report_format), "I will use a summary."
 
     run = start_run(content: "Prepare a report")

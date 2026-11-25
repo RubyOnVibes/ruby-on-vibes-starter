@@ -2,7 +2,7 @@
 # SolidQueueJob - A job that runs on the solid_queue queue
 # This job is used to test the solid_queue adapter
 # You may inherit from this job in your own jobs to run on the solid_queue queue
-# 
+#
 
 class SolidQueueJob < ApplicationJob
   self.queue_adapter = :solid_queue

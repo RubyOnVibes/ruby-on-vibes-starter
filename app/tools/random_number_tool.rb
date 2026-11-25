@@ -30,7 +30,7 @@ class RandomNumberTool < RubyLLM::Tool
   def execute(min: nil, max: nil, count: nil)
     min = (min || 1).to_i
     max = (max || 100).to_i
-    count = [[((count || 1).to_i), 1].max, 20].min
+    count = [ [ ((count || 1).to_i), 1 ].max, 20 ].min
 
     return { error: "min (#{min}) must be less than or equal to max (#{max})" } if min > max
 

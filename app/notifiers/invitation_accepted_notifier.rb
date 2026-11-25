@@ -21,7 +21,7 @@ class InvitationAcceptedNotifier < ApplicationNotifier
     def message
       "#{user_name} accepted your invitation to #{workspace_name}"
     end
-    
+
     def title
       "Invitation Accepted"
     end
@@ -32,16 +32,16 @@ class InvitationAcceptedNotifier < ApplicationNotifier
 
     def url
       return workspaces_path unless params[:workspace]
-      
+
       workspace_members_path(params[:workspace])
     end
-    
+
     private
-    
+
     def user_name
       params[:user_name] || params[:record]&.name || "Someone"
     end
-    
+
     def workspace_name
       params[:workspace_name] || params[:workspace]&.name || "a workspace"
     end

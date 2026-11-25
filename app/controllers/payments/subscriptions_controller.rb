@@ -1,7 +1,7 @@
 class Payments::SubscriptionsController < ApplicationController
-  before_action :require_current_workspace_admin!, except: [:index, :show]
-  before_action :set_plan, only: [:update]
-  before_action :set_subscription, only: [:show, :edit, :update, :cancelling, :cancel, :pausing, :pause, :unpausing, :unpause, :upcoming]
+  before_action :require_current_workspace_admin!, except: [ :index, :show ]
+  before_action :set_plan, only: [ :update ]
+  before_action :set_subscription, only: [ :show, :edit, :update, :cancelling, :cancel, :pausing, :pause, :unpausing, :unpause, :upcoming ]
 
   def index
     redirect_to(payments_url)

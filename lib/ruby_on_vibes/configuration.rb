@@ -1,11 +1,11 @@
 module RubyOnVibes
   # Configuration class for app identity and business information
-  # 
+  #
   # CRITICAL: This is the ONLY place app/business identity values should be read from
   # - Source of truth: config/vibes.yml
   # - Backend/ERB: Use RubyOnVibes.* methods (e.g., RubyOnVibes.application_name)
   # - Frontend JS/TS/JSX/TSX: Use window.App.data() (e.g., window.App.data().name)
-  # 
+  #
   # Hot Reload: Changes to config/vibes.yml trigger engine reload, which re-initializes this class
   # All values have safe defaults - won't break if missing from config/vibes.yml
   class Configuration
@@ -50,7 +50,7 @@ module RubyOnVibes
 
     def load_from_yaml
       config_path = Rails.root.join("config", "vibes.yml")
-      
+
       if File.exist?(config_path)
         yaml_config = YAML.load_file(config_path) || {}
         yaml_config.each do |key, value|
@@ -72,7 +72,7 @@ module RubyOnVibes
 
     def default_mailer_host
       if Rails.env.production?
-        url = ENV['APPLICATION_URL']
+        url = ENV["APPLICATION_URL"]
         url ? URI.parse(url).host : "example.com"
       else
         "localhost"
@@ -82,4 +82,3 @@ module RubyOnVibes
     end
   end
 end
-

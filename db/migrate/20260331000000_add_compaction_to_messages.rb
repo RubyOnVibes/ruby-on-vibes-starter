@@ -7,6 +7,6 @@ class AddCompactionToMessages < ActiveRecord::Migration[8.0]
     add_column :chats, :last_compacted_at, :datetime
     add_column :chats, :compaction_token_threshold, :integer
     add_column :chats, :compacting_since, :datetime
-    add_index :messages, [:chat_id, :compacted]
+    add_index :messages, [ :chat_id, :compacted ]
   end
 end

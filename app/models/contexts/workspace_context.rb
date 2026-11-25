@@ -16,7 +16,7 @@ class WorkspaceContext < RecordContext
 
     string :type,
       description: "Type - personal (single member) or team (multi-member)",
-      enum: ['personal', 'team']
+      enum: [ "personal", "team" ]
 
     integer :members_count,
       description: "Number of members in the workspace",
@@ -24,7 +24,7 @@ class WorkspaceContext < RecordContext
 
     string :owner_username, description: "Owner's @username"
   end
-  
+
   ##
   # Create context from Workspace record
   #
@@ -36,7 +36,7 @@ class WorkspaceContext < RecordContext
       id: workspace.to_param,
       name: workspace.name,
       path: workspace.mentionable_path,
-      type: workspace.personal? ? 'personal' : 'team',
+      type: workspace.personal? ? "personal" : "team",
       members_count: workspace.members_count || 0,
       owner_username: workspace.owner.username
     )
@@ -46,4 +46,3 @@ class WorkspaceContext < RecordContext
     "#{data[:type].titleize} workspace '#{data[:name]}' (#{data[:members_count]} #{data[:members_count] == 1 ? 'member' : 'members'}, owned by @#{data[:owner_username]})"
   end
 end
-

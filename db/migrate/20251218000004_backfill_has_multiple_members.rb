@@ -13,7 +13,7 @@ class BackfillHasMultipleMembers < ActiveRecord::Migration[8.1]
         HAVING COUNT(*) > 1
       )
     SQL
-    
+
     # Set has_multiple_members = false for chats with exactly 1 member (default, but explicit)
     execute <<-SQL
       UPDATE chats

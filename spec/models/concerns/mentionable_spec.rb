@@ -4,7 +4,7 @@ require 'rails_helper'
 
 RSpec.describe Mentionable, type: :model do
   # Contract test: documents the interface that all @mentionable models must provide
-  
+
   describe 'included interface' do
     # Test with Member since it includes Mentionable
     let(:member) { members(:alice_team_member) }
@@ -32,7 +32,7 @@ RSpec.describe Mentionable, type: :model do
     describe '#to_mention' do
       it 'returns hash for frontend autocomplete' do
         mention = member.to_mention
-        
+
         expect(mention).to include(
           id: member.to_param,
           model: 'Member',
@@ -52,7 +52,7 @@ RSpec.describe Mentionable, type: :model do
       context 'when RecordContext class exists' do
         it 'returns context instance' do
           context = member.to_llm_context
-          
+
           expect(context).to be_a(MemberContext)
           expect(context.id).to eq(member.to_param)
         end
@@ -71,7 +71,7 @@ RSpec.describe Mentionable, type: :model do
     describe '#to_llm_mention' do
       it 'returns lightweight hash for LLM' do
         mention = member.to_llm_mention
-        
+
         expect(mention[:type]).to eq('Member')
         expect(mention[:id]).to eq(member.to_param)
         expect(mention[:label]).to eq(member.mentionable_label)
@@ -111,4 +111,3 @@ RSpec.describe Mentionable, type: :model do
     end
   end
 end
-

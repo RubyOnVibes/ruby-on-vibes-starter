@@ -99,7 +99,7 @@ module Examples
     end
 
     def set_content_digest
-      self.content_digest = Digest::SHA256.hexdigest(JSON.generate([title, body]))
+      self.content_digest = Digest::SHA256.hexdigest(JSON.generate([ title, body ]))
     end
 
     def workspace_matches_context

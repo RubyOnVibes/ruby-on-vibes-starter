@@ -7,9 +7,9 @@ class Member < ApplicationRecord
 
   belongs_to :workspace, counter_cache: true
   belongs_to :user
-  
+
   # Chat associations - multi-member support
-  has_many :owned_chats, class_name: 'Chat', foreign_key: 'member_id', dependent: :destroy
+  has_many :owned_chats, class_name: "Chat", foreign_key: "member_id", dependent: :destroy
   has_many :chat_members, dependent: :destroy
   has_many :chats, through: :chat_members  # All chats this member can access
   has_many :initiated_chat_runs,
@@ -17,7 +17,7 @@ class Member < ApplicationRecord
     foreign_key: :initiated_by_member_id,
     dependent: :nullify,
     inverse_of: :initiated_by_member
-  
+
   has_many :initiated_agent_deliveries,
     class_name: "AgentDelivery",
     foreign_key: :initiated_by_member_id,
@@ -25,16 +25,16 @@ class Member < ApplicationRecord
     inverse_of: :initiated_by_member
 
   # Chat invitations
-  has_many :sent_chat_invitations, class_name: 'ChatInvitation', foreign_key: 'inviter_id', dependent: :destroy
-  has_many :received_chat_invitations, class_name: 'ChatInvitation', foreign_key: 'invitee_id', dependent: :destroy
-  
+  has_many :sent_chat_invitations, class_name: "ChatInvitation", foreign_key: "inviter_id", dependent: :destroy
+  has_many :received_chat_invitations, class_name: "ChatInvitation", foreign_key: "invitee_id", dependent: :destroy
+
   ##
   # Get pending chat invitations for this member
   #
   def pending_chat_invitations
     received_chat_invitations.status_pending.includes(:chat, :inviter)
   end
-  
+
   validates :workspace_id, uniqueness: { scope: :user_id }
   validate :owner_cannot_be_removed, on: :update
 
@@ -43,7 +43,7 @@ class Member < ApplicationRecord
 
     workspace&.owner_id == user_id
   end
-  
+
   ##
   # Mentionable label - just the user's name
   # Keep simple to avoid confusing LLM (no special chars like |)
@@ -51,30 +51,30 @@ class Member < ApplicationRecord
   def mentionable_label
     user.name.presence || user.username
   end
-  
+
   ##
   # Brief summary for LLM context (multitenancy)
   #
   def mentionable_summary
     parts = []
-    
+
     # User identity
-    user_name = [user.first_name, user.last_name].join(' ').presence || user.email
+    user_name = [ user.first_name, user.last_name ].join(" ").presence || user.email
     parts << "User: #{user_name}"
-    
+
     # Workspace context
     parts << "Workspace: #{workspace.name}"
-    
+
     # Roles
-    roles_list = active_roles.map(&:to_s).join(', ')
+    roles_list = active_roles.map(&:to_s).join(", ")
     parts << "Roles: #{roles_list}" if roles_list.present?
-    
+
     # Ownership
     parts << "Owner" if workspace_owner?
-    
+
     "Member (#{parts.join(', ')})"
   end
-  
+
   ##
   # Simple path for @mentions - /m/:id
   # Doesn't require workspace context in URL (looked up from member)
@@ -90,7 +90,7 @@ class Member < ApplicationRecord
     return unless workspace&.owner_id == user_id && admin_changed?
 
     if ActiveRecord::Type::Boolean.new.cast(admin) == false
-      errors.add(:admin, 'cannot be marked false for the workspace owner')
+      errors.add(:admin, "cannot be marked false for the workspace owner")
     end
   end
 end

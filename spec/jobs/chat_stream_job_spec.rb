@@ -14,7 +14,7 @@ RSpec.describe ChatStreamJob, type: :job do
     allow(Turbo::StreamsChannel).to receive(:broadcast_action_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
     allow(Turbo::StreamsChannel).to receive(:broadcast_append_to)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([Examples::RenameChatTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ Examples::RenameChatTool ])
   end
 
   def new_run
@@ -38,7 +38,7 @@ RSpec.describe ChatStreamJob, type: :job do
       def execute = raise("This effect must never execute")
     end
     stub_const("RevokedEffectTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([RevokedEffectTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ RevokedEffectTool ])
     stub_replies tool_call(:revoked_effect), "Finished"
     allow_any_instance_of(RubyLLM::Providers::Anthropic).to receive(:complete).and_wrap_original do |original, *args, **kwargs, &block|
       result = original.call(*args, **kwargs, &block)
@@ -68,7 +68,7 @@ RSpec.describe ChatStreamJob, type: :job do
       def resume(*) = "Work complete"
     end
     stub_const("DeferredQueueTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([DeferredQueueTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ DeferredQueueTool ])
     stub_replies tool_call(:deferred_queue), "Finished"
     allow(described_class).to receive(:set).and_return(described_class)
     allow(described_class).to receive(:perform_later).and_raise(ActiveJob::EnqueueError, "queue offline")
@@ -96,7 +96,7 @@ RSpec.describe ChatStreamJob, type: :job do
       def resume(*) = raise("A duplicate delivery must not resume this task")
     end
     stub_const("AwaitExternalTool", tool)
-    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([AwaitExternalTool])
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([ AwaitExternalTool ])
     stub_replies tool_call(:await_external)
     run = new_run
     described_class.perform_now(run.id)

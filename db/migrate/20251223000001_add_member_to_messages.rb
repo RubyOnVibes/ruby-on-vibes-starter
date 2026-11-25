@@ -7,4 +7,3 @@ class AddMemberToMessages < ActiveRecord::Migration[8.0]
     add_foreign_key :messages, :members
   end
 end
-

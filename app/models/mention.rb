@@ -13,27 +13,27 @@
 class Mention < ApplicationRecord
   belongs_to :message
   belongs_to :mentionable, polymorphic: true, optional: true  # Allow nil for deleted records
-  
+
   # Check if the mentioned record has been deleted
   def deleted?
     mentionable.nil?
   end
-  
+
   # Get the routing param for the mentioned model
   # Uses to_param for prefixed IDs, falls back to id
   def mentionable_param
     return nil unless mentionable
-    
+
     mentionable.respond_to?(:to_param) ? mentionable.to_param : mentionable.id.to_s
   end
-  
+
   # Get the current label (always fresh from mentionable)
   def label
     return "[Deleted #{mentionable_type}]" if deleted?
-    
+
     mentionable.mentionable_label
   end
-  
+
   # Serialize for frontend
   def as_json(options = {})
     {

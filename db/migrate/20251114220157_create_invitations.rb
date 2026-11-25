@@ -9,9 +9,9 @@ class CreateInvitations < ActiveRecord::Migration[8.1]
       t.string "token", null: false
       t.timestamps
 
-      t.index ["account_id", "email"], name: "index_account_invitations_on_account_id_and_email", unique: true
-      t.index ["invited_by_id"], name: "index_account_invitations_on_invited_by_id"
-      t.index ["token"], name: "index_account_invitations_on_token", unique: true
+      t.index [ "account_id", "email" ], name: "index_account_invitations_on_account_id_and_email", unique: true
+      t.index [ "invited_by_id" ], name: "index_account_invitations_on_invited_by_id"
+      t.index [ "token" ], name: "index_account_invitations_on_token", unique: true
     end
 
     add_foreign_key "invitations", "accounts"

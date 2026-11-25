@@ -37,7 +37,7 @@ RSpec.describe User, type: :model do
     it 'names personal orgs "Personal Workspace"' do
       user = users(:alice)
       personal_org = user.personal_workspace
-      
+
       # All personal orgs have same name for simplicity
       expect(personal_org.name).to eq('Personal Workspace')
       expect(personal_org.personal?).to be true

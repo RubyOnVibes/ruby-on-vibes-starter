@@ -90,7 +90,7 @@ end
 
 class DurabilityProbeAgent < ApplicationAgent
   instructions "Complete the supplied local validation operation."
-  tools { [DurabilityProbeTool.new(run: run_context.run)] }
+  tools { [ DurabilityProbeTool.new(run: run_context.run) ] }
   tool_options rounds: 5, calls: 5
 end
 
@@ -114,7 +114,7 @@ module DurabilityProbe
   end
 
   def self.command(mode, database, run)
-    [RbConfig.ruby, __FILE__, "--#{mode}", database, run.id.to_s]
+    [ RbConfig.ruby, __FILE__, "--#{mode}", database, run.id.to_s ]
   end
 
   def self.deliver(mode, database, run, expected_exit: 0)

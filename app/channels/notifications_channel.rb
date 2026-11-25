@@ -11,7 +11,7 @@ class NotificationsChannel < ApplicationCable::Channel
     # Subscribe to user's notification stream
     stream_from "notifications_#{current_user.id}" if current_user
   end
-  
+
   def unsubscribed
     # Cleanup when channel is unsubscribed
     stop_all_streams

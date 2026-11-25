@@ -13,7 +13,7 @@ class PlanResource < Madmin::Resource
   attribute :hidden, index: true, description: "Hidden plans are only accessible with direct links or via existing subscriptions."
   attribute :amount, description: "Plan Amount (priced in cents)", index: true
   attribute :currency, description: "Plan currency (must be a 3-letter ISO currency code)"
-  attribute :interval, :select, collection: ["month", "year"], index: true
+  attribute :interval, :select, collection: [ "month", "year" ], index: true
   attribute :interval_count, description: "How many intervals to wait before billing a subscription again. e.g.) with interval as 'month' & interval_count to 3, it bills the customer every three months"
   attribute :stripe_tax, :boolean do |config|
     config.description = "Collect tax via Stripe?"
@@ -35,7 +35,7 @@ class PlanResource < Madmin::Resource
   def self.default_sort_column
     "updated_at"
   end
-  
+
   def self.default_sort_direction
     "desc"
   end

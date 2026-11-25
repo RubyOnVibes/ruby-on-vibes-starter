@@ -12,7 +12,7 @@
 #     policy.object_src  :none
 #     policy.script_src  :self, :https
 #     policy.style_src   :self, :https
-    # Allow @vite/client to hot reload style changes in development
+# Allow @vite/client to hot reload style changes in development
 #    policy.style_src *policy.style_src, :unsafe_inline if Rails.env.development?
 
 #     # Specify URI for violation reports

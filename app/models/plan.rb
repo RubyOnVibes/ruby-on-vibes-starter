@@ -43,7 +43,7 @@ class Plan < ApplicationRecord
   # Returns plans sorted by interval (monthly first) then by amount ascending.
   # Uses Ruby sorting to support complex ordering not easily done in SQL.
   scope :sorted, -> {
-    all.sort_by { |plan| [INTERVAL_ORDER.fetch(plan.interval, 99), plan.amount] }
+    all.sort_by { |plan| [ INTERVAL_ORDER.fetch(plan.interval, 99), plan.amount ] }
   }
 
   scope :monthly, -> { where(interval: "month") }
@@ -125,4 +125,4 @@ class Plan < ApplicationRecord
     suffix = monthly? ? "Monthly" : "Yearly"
     "#{name} (#{suffix})"
   end
-end  
+end

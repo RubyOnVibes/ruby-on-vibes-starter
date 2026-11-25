@@ -1,12 +1,12 @@
 class User < ApplicationRecord
   # Include default devise modules.
-    # Add :confirmable to enable email confs upon signup or email change.
-    # Add omniauth_providers to enable omniauth for the given providers.
-    # Add :omniauthable to enable omniauth
+  # Add :confirmable to enable email confs upon signup or email change.
+  # Add omniauth_providers to enable omniauth for the given providers.
+  # Add :omniauthable to enable omniauth
   devise :database_authenticatable, :registerable,
         :recoverable, :rememberable, :validatable,
         :trackable, :lockable
-  
+
   has_prefix_id :user
 
   has_referrals
@@ -14,16 +14,16 @@ class User < ApplicationRecord
   has_one_attached :avatar
 
   before_validation :generate_username, on: :create, if: -> { username.blank? }
-  validates :username, presence: true, 
+  validates :username, presence: true,
             uniqueness: { case_sensitive: false },
             format: { with: /\A[a-z0-9_]+\z/, message: "only lowercase letters, numbers, and underscores" },
             length: { in: 3..30 }
-    
+
   before_validation :parse_full_name, if: :full_name?
   before_validation :set_gravatar_url, if: :email_changed?
-  
+
   attr_accessor :full_name
-  
+
   validate :full_name_present, on: :create
   validates :first_name, presence: true, unless: :new_record?
 
@@ -32,11 +32,11 @@ class User < ApplicationRecord
   has_many :members, dependent: :destroy
   has_many :workspaces, through: :members
   has_many :owned_workspaces, class_name: "Workspace", inverse_of: :owner, foreign_key: :owner_id, dependent: :destroy
-  
+
   # Chats belong to members (not directly to users)
   # Access via personal_workspace.members.first.chats or through_members
   has_many :chats, through: :members
-  
+
   # Noticed gem - notifications belong to users
   has_many :notifications, as: :recipient, dependent: :destroy, class_name: "Noticed::Notification"
   has_many :notification_mentions, as: :record, dependent: :destroy, class_name: "Noticed::Event"
@@ -48,7 +48,7 @@ class User < ApplicationRecord
 
   accepts_nested_attributes_for :owned_workspaces, reject_if: :all_blank
 
-  def name  
+  def name
     "#{first_name} #{last_name}".strip.presence || "User #{id}"
   end
 
@@ -88,10 +88,10 @@ class User < ApplicationRecord
 
   def parse_full_name
     return if full_name.blank?
-    
-    parts = full_name.strip.split(' ', 2)
-    self.first_name = parts[0] || ''
-    self.last_name = parts[1] || ''
+
+    parts = full_name.strip.split(" ", 2)
+    self.first_name = parts[0] || ""
+    self.last_name = parts[1] || ""
   end
 
   def set_gravatar_url

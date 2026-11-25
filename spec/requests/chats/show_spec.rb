@@ -17,7 +17,7 @@ RSpec.describe "Chat page rendering", type: :request do
     chat.chat_runs.active.delete_all
     chat.messages.destroy_all
     allow_any_instance_of(ToolsetService).to receive(:tool_classes)
-      .and_return([CurrentDateTimeTool, Examples::RenameChatTool])
+      .and_return([ CurrentDateTimeTool, Examples::RenameChatTool ])
   end
 
   it "renders the shared adapter partial for user, assistant, system, tool result and native approval messages" do

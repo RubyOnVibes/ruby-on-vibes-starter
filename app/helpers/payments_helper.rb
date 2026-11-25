@@ -3,7 +3,7 @@ module PaymentsHelper
   # Consolidates: PlansHelper (domain-specific payment/billing logic)
 
   # ==================== PLAN FORMATTING ====================
-  
+
   # Formats the billing interval for display
   # @example
   #   <%= plan_interval(@plan) %>  # => "month" or "3 months"
@@ -14,9 +14,9 @@ module PaymentsHelper
       plan.interval
     end
   end
-  
+
   # ==================== SUBSCRIPTION HELPERS ====================
-  
+
   # Add more payment-related helpers here as needed:
   # - Subscription status badges
   # - Payment method formatting
@@ -24,4 +24,3 @@ module PaymentsHelper
   # - Trial period calculations
   # - Invoice helpers
 end
-

@@ -12,11 +12,11 @@ class CreateChatMembers < ActiveRecord::Migration[8.1]
     end
 
     # Ensure each member can only be added to a chat once
-    add_index :chat_members, [:chat_id, :member_id], unique: true
-    
+    add_index :chat_members, [ :chat_id, :member_id ], unique: true
+
     # Ensure each chat has exactly one owner (enforced at DB level)
-    add_index :chat_members, :chat_id, 
-      unique: true, 
+    add_index :chat_members, :chat_id,
+      unique: true,
       where: "role = 0",
       name: "index_chat_members_on_chat_id_unique_owner"
   end

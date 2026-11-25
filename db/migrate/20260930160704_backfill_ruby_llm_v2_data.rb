@@ -6,7 +6,7 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
   # Keep this historical migration replayable after RubyLLM 2.0's migration
   # helpers were removed. Adapted from RubyLLM 2.0 (MIT), LegacyContentSQL.
   class LegacyContentSQL
-    SPACE = [9, 10, 11, 12, 13, 32, 133, 160, 5760, *8192..8202, 8232, 8233, 8239, 8287, 12_288].pack('U*').freeze
+    SPACE = [ 9, 10, 11, 12, 13, 32, 133, 160, 5760, *8192..8202, 8232, 8233, 8239, 8287, 12_288 ].pack('U*').freeze
 
     def initialize(connection)
       @connection = connection
@@ -15,11 +15,11 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
     def render(content:, raw:)
       normalized, rendered, nonblank = case @connection.adapter_name
       when 'PostgreSQL'
-        ["(#{raw}::jsonb)::text", "#{raw}::text", "btrim(#{raw}::jsonb #>> '{}', #{@connection.quote(SPACE)}) <> ''"]
+        [ "(#{raw}::jsonb)::text", "#{raw}::text", "btrim(#{raw}::jsonb #>> '{}', #{@connection.quote(SPACE)}) <> ''" ]
       when 'Mysql2'
-        ["CAST(#{raw} AS CHAR)", "CAST(#{raw} AS CHAR)", "JSON_UNQUOTE(#{raw}) NOT REGEXP '^[[:space:]]*$'"]
+        [ "CAST(#{raw} AS CHAR)", "CAST(#{raw} AS CHAR)", "JSON_UNQUOTE(#{raw}) NOT REGEXP '^[[:space:]]*$'" ]
       else
-        ["json(#{raw})", raw, "trim(json_extract(#{raw}, '$'), #{@connection.quote(SPACE)}) <> ''"]
+        [ "json(#{raw})", raw, "trim(json_extract(#{raw}, '$'), #{@connection.quote(SPACE)}) <> ''" ]
       end
       present = "#{normalized} NOT IN ('null', 'false', '[]', '{}') AND #{nonblank}"
       "CASE WHEN #{present} THEN #{rendered} ELSE #{content} END"
@@ -59,9 +59,9 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
 
   def backfill_required_defaults
     {
-      chats: {cancelled: false},
-      messages: {cache_until_here: false},
-      ruby_llm_tool_calls: {message_type: 'Message'}
+      chats: { cancelled: false },
+      messages: { cache_until_here: false },
+      ruby_llm_tool_calls: { message_type: 'Message' }
     }.each do |table, attributes|
       column, value = attributes.first
       migration_record(table).where(column => nil).in_batches(of: BATCH_SIZE) do |batch|
@@ -245,7 +245,7 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
       models << "legacy_chat_models.#{quote_column(:model_id)}"
     end
 
-    [joins.join("\n"), coalesce_sql(providers), coalesce_sql(models)]
+    [ joins.join("\n"), coalesce_sql(providers), coalesce_sql(models) ]
   end
 
   def legacy_usage_conditions
@@ -375,14 +375,14 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
     row = progress_records.where(task: task)
     return row.update_all(last_id: last_id, completed: false) if row.exists?
 
-    progress_records.insert_all!([{ task: task, last_id: last_id, completed: false }], returning: false)
+    progress_records.insert_all!([ { task: task, last_id: last_id, completed: false } ], returning: false)
   end
 
   def mark_completed(task)
     row = progress_records.where(task: task)
     return row.update_all(completed: true) if row.exists?
 
-    progress_records.insert_all!([{ task: task, completed: true }], returning: false)
+    progress_records.insert_all!([ { task: task, completed: true } ], returning: false)
   end
 
   def coalesce_sql(values)

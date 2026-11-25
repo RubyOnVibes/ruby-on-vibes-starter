@@ -41,4 +41,3 @@ class ChatChannel < ApplicationCable::Channel
     chat.chat_members.where(member_id: member_ids).exists?
   end
 end
-

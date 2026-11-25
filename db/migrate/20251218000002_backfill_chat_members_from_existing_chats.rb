@@ -6,7 +6,7 @@ class BackfillChatMembersFromExistingChats < ActiveRecord::Migration[8.1]
     # Use chat.created_at for historical accuracy (when owner created = when they joined)
     execute <<-SQL
       INSERT INTO chat_members (chat_id, member_id, role, created_at, updated_at)
-      SELECT 
+      SELECT#{' '}
         id as chat_id,
         member_id,
         0 as role,  -- owner

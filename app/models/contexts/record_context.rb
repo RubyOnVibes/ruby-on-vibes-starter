@@ -13,31 +13,30 @@
 #
 class RecordContext
   class << self
-    
     ##
     # Define the schema for this context
     # Delegates to the Schematist schema DSL used by RubyLLM.
     #
     def schema(&block)
       # Capture context class name outside the block
-      context_name = name&.sub('Context', '') || 'Record'
-      
+      context_name = name&.sub("Context", "") || "Record"
+
       @schema_class ||= Class.new(Schematist::Schema) do
         # Set schema name based on context class
         name context_name
       end
-      
+
       @schema_class.class_eval(&block) if block_given?
       @schema_class
     end
-    
+
     ##
     # Get the schema class for this context
     #
     def schema_class
       @schema_class || raise(NotImplementedError, "#{name} must define a schema")
     end
-    
+
     ##
     # Create context from an ActiveRecord instance
     # Override this in subclasses
@@ -46,34 +45,34 @@ class RecordContext
       raise NotImplementedError, "#{name} must implement .from_record(record)"
     end
   end
-  
+
   attr_reader :data
-  
+
   def initialize(data = {})
     @data = data.with_indifferent_access
     validate!
   end
-  
+
   ##
   # Validate data against schema
   # Raises error if invalid in development
   #
   def validate!
     schema_class = self.class.schema_class
-    
+
     # Schematist handles the schema shape; record-specific validation stays here.
     # but we can check required fields
     required = to_json_schema.dig(:schema, :required) || []
-    
+
     required.each do |field|
       unless @data.key?(field) || @data.key?(field.to_sym)
         raise ArgumentError, "#{self.class.name}: Missing required field '#{field}'"
       end
     end
-    
+
     true
   end
-  
+
   ##
   # Export as JSON Schema
   # Used by LLM for understanding structure
@@ -86,28 +85,28 @@ class RecordContext
       schema: raw.except(:"$schema")
     }
   end
-  
+
   ##
   # Serialize to hash for LLM consumption
   #
   def to_h
     @data
   end
-  
+
   ##
   # Serialize to JSON
   #
   def to_json(*args)
     @data.to_json(*args)
   end
-  
+
   ##
   # String representation for debugging
   #
   def to_s
     "#{self.class.name}(#{@data.inspect})"
   end
-  
+
   ##
   # Format for LLM instructions
   # Returns schema + data in a structured format
@@ -120,7 +119,7 @@ class RecordContext
     when :json
       to_json
     when :yaml
-      require 'yaml'
+      require "yaml"
       @data.to_yaml
     when :schema_plus_data
       schema = to_json_schema
@@ -134,7 +133,7 @@ class RecordContext
       to_json
     end
   end
-  
+
   ##
   # Method missing for hash-like access
   #
@@ -145,7 +144,7 @@ class RecordContext
       super
     end
   end
-  
+
   def respond_to_missing?(method_name, include_private = false)
     @data.key?(method_name) || super
   end

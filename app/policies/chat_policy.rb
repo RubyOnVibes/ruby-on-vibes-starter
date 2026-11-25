@@ -12,23 +12,23 @@ class ChatPolicy < ApplicationPolicy
   def show?
     record.member_exists?(member)
   end
-  
+
   def update?
     owner?
   end
-  
+
   def destroy?
     owner?
   end
-  
+
   def manage_members?
     owner?
   end
-  
+
   def send_messages?
     member?
   end
-  
+
   def cancel_runs?
     member?
   end
@@ -36,11 +36,11 @@ class ChatPolicy < ApplicationPolicy
   def approve_tools?
     member?
   end
-  
+
   def leave?
     member? && !owner?
   end
-  
+
   def to_h
     {
       "can_view" => show?,
@@ -54,14 +54,14 @@ class ChatPolicy < ApplicationPolicy
       "is_member" => member?
     }
   end
-  
+
   private
-  
+
   def owner?
     return false unless member
     record.owner?(member)
   end
-  
+
   def member?
     return false unless member
     record.member_exists?(member)

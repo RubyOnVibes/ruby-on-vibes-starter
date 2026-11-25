@@ -13,7 +13,7 @@ class CreateExampleReportPublications < ActiveRecord::Migration[8.1]
       t.datetime :published_at
       t.timestamps
     end
-    add_index :example_report_publications, [:workspace_id, :publication_key], unique: true,
+    add_index :example_report_publications, [ :workspace_id, :publication_key ], unique: true,
       name: "index_example_publications_on_business_key"
   end
 end

@@ -9,15 +9,15 @@ class ChatFileLibrary
   MAX_UPLOAD_BYTES = 25.megabytes
   MAX_FILENAME_BYTES = 180
   UPLOAD_TYPES = {
-    ".pdf" => ["application/pdf"],
-    ".txt" => ["text/plain"],
-    ".md" => ["text/markdown", "text/plain"],
-    ".csv" => ["text/csv", "text/plain"],
-    ".json" => ["application/json", "text/plain"],
-    ".png" => ["image/png"],
-    ".jpg" => ["image/jpeg"],
-    ".jpeg" => ["image/jpeg"],
-    ".webp" => ["image/webp"]
+    ".pdf" => [ "application/pdf" ],
+    ".txt" => [ "text/plain" ],
+    ".md" => [ "text/markdown", "text/plain" ],
+    ".csv" => [ "text/csv", "text/plain" ],
+    ".json" => [ "application/json", "text/plain" ],
+    ".png" => [ "image/png" ],
+    ".jpg" => [ "image/jpeg" ],
+    ".jpeg" => [ "image/jpeg" ],
+    ".webp" => [ "image/webp" ]
   }.freeze
 
   attr_reader :chat

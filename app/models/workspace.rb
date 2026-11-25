@@ -97,34 +97,34 @@ class Workspace < ApplicationRecord
   def team?
     is_team_workspace?
   end
-  
+
   ##
   # Mentionable label - just the name (already descriptive)
   #
   def mentionable_label
     name
   end
-  
+
   ##
   # Brief summary for LLM context
   #
   def mentionable_summary
     parts = []
-    
+
     # Name and type
     type_label = personal? ? "Personal" : "Team"
     parts << "#{type_label} workspace '#{name}'"
-    
+
     # Member count
     parts << "#{members_count} #{members_count == 1 ? 'member' : 'members'}"
-    
+
     # Owner
-    owner_name = [owner.first_name, owner.last_name].join(' ').presence || owner.email
+    owner_name = [ owner.first_name, owner.last_name ].join(" ").presence || owner.email
     parts << "owned by #{owner_name}"
-    
-    parts.join(', ')
+
+    parts.join(", ")
   end
-  
+
   ##
   # Custom path - link to workspace settings/dashboard
   #

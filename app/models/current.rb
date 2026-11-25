@@ -109,4 +109,4 @@ class Current < ActiveSupport::CurrentAttributes
 
     user.workspaces.where.not(id: workspace&.id).order(:id)
   end
-end 
+end

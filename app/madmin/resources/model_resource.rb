@@ -19,7 +19,7 @@ class ModelResource < Madmin::Resource
   def self.default_sort_column
     "updated_at"
   end
-  
+
   def self.default_sort_direction
     "desc"
   end

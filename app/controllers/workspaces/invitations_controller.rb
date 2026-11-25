@@ -10,7 +10,7 @@ class Workspaces::InvitationsController < Workspaces::BaseController
 
   before_action :authenticate_user!
   before_action :load_workspace
-  before_action :load_invitation, only: [:edit, :update, :destroy, :resend]
+  before_action :load_invitation, only: [ :edit, :update, :destroy, :resend ]
 
   # GET /workspaces/:workspace_id/invitations/new
   def new

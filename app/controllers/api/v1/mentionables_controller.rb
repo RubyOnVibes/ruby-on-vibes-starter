@@ -45,8 +45,8 @@ module Api
       # Method must return Array of mention hashes (use record.to_mention).
       #
       SEARCHERS = {
-        'Member' => :search_members,
-        'Workspace' => :search_workspaces
+        "Member" => :search_members,
+        "Workspace" => :search_workspaces
         # 'Chat' => :search_chats  # Uncomment to enable chat mentions
       }.freeze
 
@@ -71,12 +71,12 @@ module Api
       def parse_limit(limit_param)
         return 5 if limit_param.blank?
 
-        [[limit_param.to_i, 1].max, 10].min
+        [ [ limit_param.to_i, 1 ].max, 10 ].min
       end
 
       def parse_types(types_param)
         if types_param.present?
-          requested = types_param.to_s.split(',').map(&:strip).map(&:classify)
+          requested = types_param.to_s.split(",").map(&:strip).map(&:classify)
           SEARCHERS.keys & requested
         else
           SEARCHERS.keys

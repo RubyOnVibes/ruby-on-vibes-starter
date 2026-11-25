@@ -1,10 +1,10 @@
-resource :pricing, to: 'pages#pricing'
+resource :pricing, to: "pages#pricing"
 
 namespace :checkout do
-  resource :return, only: [:show], controller: '/payments/checkout/returns'
+  resource :return, only: [ :show ], controller: "/payments/checkout/returns"
 end
 
-resource :checkout, controller: 'payments/checkout'
+resource :checkout, controller: "payments/checkout"
 
 resource :payments, controller: :payments
 
@@ -15,7 +15,7 @@ namespace :payments do
     member { get :invoice }
   end
 
-  resources :subscriptions, only: [:index, :edit, :update] do    
+  resources :subscriptions, only: [ :index, :edit, :update ] do
     member do
       get :cancelling
       delete :cancel

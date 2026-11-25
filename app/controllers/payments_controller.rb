@@ -1,10 +1,10 @@
 class PaymentsController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_current_workspace_admin!, except: [:show]
+  before_action :require_current_workspace_admin!, except: [ :show ]
 
   def show
     @payment_processor = current_workspace.payment_processor
-    @subscriptions = current_workspace.pay_subscriptions.active.or(current_workspace.pay_subscriptions.past_due).or(current_workspace.pay_subscriptions.unpaid).order(created_at: :asc).includes([:customer])
+    @subscriptions = current_workspace.pay_subscriptions.active.or(current_workspace.pay_subscriptions.past_due).or(current_workspace.pay_subscriptions.unpaid).order(created_at: :asc).includes([ :customer ])
   end
 
   def update
@@ -15,7 +15,7 @@ class PaymentsController < ApplicationController
   private
 
   def billing_params
-    params.expect(workspace: [:extra_billing_info, :billing_email])
+    params.expect(workspace: [ :extra_billing_info, :billing_email ])
   end
 
   def set_subscription

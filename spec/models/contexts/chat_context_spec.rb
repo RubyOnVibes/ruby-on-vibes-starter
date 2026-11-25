@@ -4,7 +4,7 @@ require 'rails_helper'
 
 RSpec.describe ChatContext, type: :model do
   # Contract test: documents what data the LLM receives when a Chat is @mentioned
-  
+
   describe '.from_record' do
     let(:chat) { chats(:team_chat) }
     let(:context) { described_class.from_record(chat) }
@@ -55,7 +55,7 @@ RSpec.describe ChatContext, type: :model do
 
       it 'serializes model info' do
         context = described_class.from_record(chat)
-        
+
         expect(context.model[:id]).to eq('claude-sonnet-4-20250514')
         expect(context.model[:name]).to eq('Claude Sonnet 4')
         expect(context.model[:provider]).to eq('anthropic')
@@ -67,7 +67,7 @@ RSpec.describe ChatContext, type: :model do
     it 'returns human-readable summary' do
       chat = chats(:team_chat)
       context = described_class.from_record(chat)
-      
+
       summary = context.summary
       expect(summary).to include('Chat')
       expect(summary).to include(chat.name)
@@ -101,7 +101,7 @@ RSpec.describe ChatContext, type: :model do
 
     it 'exports valid JSON schema' do
       schema = context.to_json_schema
-      
+
       # Schema name represents the model, not the Context wrapper
       expect(schema[:name]).to eq('Chat')
       expect(schema[:schema][:properties][:messages_count][:minimum]).to eq(0)
@@ -111,4 +111,3 @@ RSpec.describe ChatContext, type: :model do
     end
   end
 end
-

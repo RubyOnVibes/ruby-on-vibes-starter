@@ -23,15 +23,15 @@ class ChatRun < ApplicationRecord
 
   scope :active, -> { where(status: [ :pending, :running, :awaiting_tasks, :awaiting_approval ]) }
   scope :for_chat, ->(chat) { where(chat: chat) }
-  
+
   # Capture node name on creation
   before_create :set_node_name
-  
+
   # Auto-set completion timestamps when status changes
   before_update :set_completion_timestamps, if: :status_changed?
-  
+
   # Broadcast state changes to chat stream
-  after_commit :broadcast_state_change, on: [:create, :update]
+  after_commit :broadcast_state_change, on: [ :create, :update ]
 
   def active?
     status_pending? || status_running? || status_awaiting_tasks? || status_awaiting_approval?
@@ -157,7 +157,7 @@ class ChatRun < ApplicationRecord
 
   def pending_tool_approvals
     approval_tool_calls.select do |tool_call|
-      tool_call.metadata["requires_approval"] && tool_call.approval.in?([nil, "pending"])
+      tool_call.metadata["requires_approval"] && tool_call.approval.in?([ nil, "pending" ])
     end
   end
 
@@ -227,14 +227,14 @@ class ChatRun < ApplicationRecord
   def stopping?
     status_cancelled? || status_failed?
   end
-  
+
   def ended_at
     completed_at || cancelled_at || failed_at || updated_at
   end
-  
+
   def messages_during_run
     return [] unless ended_at
-    
+
     chat.messages.where(created_at: created_at..ended_at)
   end
 
@@ -259,7 +259,7 @@ class ChatRun < ApplicationRecord
   end
 
   private
-  
+
   def input_message_belongs_to_chat
     errors.add(:input_message, "must belong to this chat") if input_message && input_message.chat_id != chat_id
   end
@@ -267,31 +267,31 @@ class ChatRun < ApplicationRecord
   def set_node_name
     self.node_name = current_node_name
   end
-  
+
   def current_node_name
-    ENV['NODE_NAME'] || Socket.gethostname
+    ENV["NODE_NAME"] || Socket.gethostname
   end
-  
-  def set_completion_timestamps    
+
+  def set_completion_timestamps
     case status
-    when 'completed'
+    when "completed"
       self.completed_at = Time.current
-    when 'cancelled'
+    when "cancelled"
       self.cancelled_at = Time.current
-    when 'failed'
+    when "failed"
       self.failed_at = Time.current
     end
   end
 
   def broadcast_state_change
     stream_name = "chat_#{chat_id}"
-    
+
     Turbo::StreamsChannel.broadcast_replace_to(
       stream_name,
       target: "chat-run-state",
       partial: "chat_runs/state",
       locals: { chat_run: self }
-    )    
+    )
   rescue => e
     Rails.logger.error "[ChatRun] ❌ Broadcast failed: #{e.class} - #{e.message}"
     Rails.logger.error e.backtrace.first(5).join("\n")

@@ -11,10 +11,9 @@ class CreateMentions < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
-    
+
     add_index :mentions, :sgid
     add_index :mentions, :mentionable_type
-    add_index :mentions, [:message_id, :sgid]
+    add_index :mentions, [ :message_id, :sgid ]
   end
 end
-

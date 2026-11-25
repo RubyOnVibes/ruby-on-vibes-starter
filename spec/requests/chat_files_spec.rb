@@ -13,7 +13,7 @@ RSpec.describe "Chat files", type: :request do
   end
 
   def uploaded_document(name: "brief.txt", contents: "A new project brief", type: "text/plain")
-    Tempfile.create(["chat-upload", File.extname(name)]) do |source|
+    Tempfile.create([ "chat-upload", File.extname(name) ]) do |source|
       source.binmode
       source.write(contents)
       source.rewind

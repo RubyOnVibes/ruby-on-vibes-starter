@@ -4,8 +4,8 @@ class Mailbin::ApplicationController < ::ApplicationController
   private
 
   def authenticate_mailbin_user!
-    raise 'Mailbin not allowed in this environment' unless Rails.env.development? || ENV['USE_MOUNTED_VIBES'] == 'true'
+    raise "Mailbin not allowed in this environment" unless Rails.env.development? || ENV["USE_MOUNTED_VIBES"] == "true"
 
-    redirect_to '/' unless current_user&.admin?
+    redirect_to "/" unless current_user&.admin?
   end
 end

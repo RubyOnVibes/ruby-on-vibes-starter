@@ -38,7 +38,7 @@ class Agent < ApplicationRecord
   before_create :generate_webhook_token
 
   scope :active, -> { where(active: true) }
-  scope :scheduled, -> { active.where.not(schedule: [nil, ""]) }
+  scope :scheduled, -> { active.where.not(schedule: [ nil, "" ]) }
   scope :webhook_enabled, -> { active.where.not(webhook_token: nil) }
 
   def scheduled?
@@ -109,7 +109,7 @@ class Agent < ApplicationRecord
   end
 
   def mentionable_summary
-    parts = [name]
+    parts = [ name ]
     parts << (active? ? "active" : "inactive")
     parts << "scheduled: #{schedule}" if scheduled?
     parts.join(" — ")
