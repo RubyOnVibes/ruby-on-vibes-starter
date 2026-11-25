@@ -42,7 +42,7 @@ This app ships with AI-native infrastructure. These systems are dormant until us
 ## Stack Overview
 
 - **Rails 8.1**, Ruby 4.0.10, Vite for JS, Propshaft for assets
-- **Falcon** web server with **async-job-adapter** for LLM streaming
+- **Falcon** web server with **Solid Queue** for durable agent jobs and **Solid Cable** for shared streaming broadcasts
 - **SolidQueue** for most background jobs, async adapter for IO-heavy LLM work
 - **SQLite** (development) or **PostgreSQL** (production)
 

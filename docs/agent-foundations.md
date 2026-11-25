@@ -37,3 +37,11 @@ We did not add a generic file audit table: a starter cannot infer every product'
 ## Validation
 
 Run `bundle exec rspec`, `bin/rails zeitwerk:check`, and `bundle exec ruby script/check_shared_broadcasts.rb`. Tests use the real RubyLLM loop with fixture provider responses for durable pauses, approvals, cancellation and usage. The shared-broadcast probe boots two processes and a disposable database. Provider credentials are unnecessary for these checks. Real provider quality, PostgreSQL multi-host concurrency and platform deployment remain separate integration checks.
+
+The standalone cross-process probe `bundle exec ruby script/check_durable_execution.rb`
+verifies task persistence/resumption, abrupt worker exit and native claim expiry,
+preserved prior tool results, non-replay of interrupted calls, and overlapping
+same-run deliveries. It uses a temporary SQLite database and blocked HTTP with
+scripted provider responses; it explicitly delivers jobs rather than testing
+queue supervision. The separate document-intake demo validates the actual worker
+and browser path.

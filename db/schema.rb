@@ -775,7 +775,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_25_120001) do
   add_foreign_key "chat_members", "members"
   add_foreign_key "chat_runs", "chats"
   add_foreign_key "chat_runs", "members", column: "initiated_by_member_id"
-  add_foreign_key "chat_runs", "messages", column: "input_message_id"
+  add_foreign_key "chat_runs", "messages", column: "input_message_id", on_delete: :nullify
   add_foreign_key "chats", "members"
   add_foreign_key "chats", "ruby_llm_models"
   add_foreign_key "chats", "users"

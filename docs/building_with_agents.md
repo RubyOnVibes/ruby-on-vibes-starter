@@ -160,25 +160,28 @@ express the desired result; inspect grader disagreements yourself. See the
 
 ## Architecture Overview
 
-The app uses Ruby's async/fiber ecosystem for concurrency. `ChatStreamJob` runs as an
-in-process fiber via `async-job`. Scheduler-compatible I/O yields while waiting
-for LLM responses or HTTP requests. CPU-heavy work and libraries that block the
-scheduler still need a separate worker; using Falcon does not make arbitrary
-Ruby code non-blocking.
+`ChatStreamJob` runs in a separate Solid Queue worker. Falcon serves HTTP and
+WebSockets; Solid Cable delivers updates across processes. Each delivery binds
+the chat's named native agent purpose and original actor. RubyLLM owns claims,
+message persistence, tool execution and task/question suspension. Rails persists
+dispatch intent and retries missing delivery through `ResumeChatRunsJob`.
 
-The web server (Falcon) and chat jobs share the same fiber scheduler. Tools run inline in the
-chat fiber. Agent tasks run in a separate SolidQueue worker process for true background work.
+See [agent foundations](agent-foundations.md) for the ownership contract,
+[chat purposes](chat_purposes.md) for configuration and [chat files](chat-files.md)
+for uploads and artifacts. Do not use in-process async jobs for work that must
+survive web restarts. CPU-heavy or long external work should return a native
+`RubyLLM::Task` and resume from persisted state.
 
 There are two ways your AI agent executes work:
 
 ### 1. Tools (Inline, Fast)
 
-Tools run **inside the chat fiber** — the same async process that handles the LLM conversation.
-Because fibers yield during I/O, a tool making an HTTP request (like fetching a web page) doesn't
-block other conversations. They're for operations that complete in seconds.
+Tools run inside the durable conversation job. Keep inline operations short;
+long work should return a native task. Worker concurrency and provider limits
+determine how many conversations can run at once.
 
 ```
-User message → ChatStreamJob (fiber) → LLM calls Tool → Tool returns result → LLM responds
+User message → ChatStreamJob (Solid Queue) → LLM calls Tool → Tool returns result → LLM responds
 ```
 
 **Use tools when:**

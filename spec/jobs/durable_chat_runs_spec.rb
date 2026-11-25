@@ -95,6 +95,38 @@ RSpec.describe "Durable chat execution", type: :job do
     expect(run.reload).to be_status_failed
   end
 
+  it "does not resurrect a run cancelled during setup" do
+    run = new_run
+    allow(ChatPurpose).to receive(:bind).and_wrap_original do |original, **args|
+      result = original.call(**args)
+      ChatRun.find(run.id).cancel!
+      result
+    end
+    expect_any_instance_of(Chat).not_to receive(:complete)
+    ChatStreamJob.perform_now(run.id)
+    expect(run.reload).to be_status_cancelled
+  end
+
+  it "keeps input-required native tasks parked until an explicit application callback" do
+    tool = Class.new(RubyLLM::Tool) do
+      description "Wait for a signed document"
+      def initialize(**); end
+      def execute = RubyLLM::Task.new(status: :input_required, data: { "envelope" => "123" })
+      def resume(task, **) = task
+    end
+    stub_const("SignatureWaitTool", tool)
+    allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([SignatureWaitTool])
+    stub_replies tool_call(:signature_wait)
+    run = new_run
+    ChatStreamJob.perform_now(run.id)
+    expect(run.reload).to be_status_awaiting_tasks
+    expect(run.resume_at).to be_nil
+    ResumeChatRunsJob.perform_now
+    expect(ChatStreamJob).not_to have_received(:perform_later)
+    expect(run.resume_tasks!(explicit: true)).to be true
+    expect(ChatStreamJob).to have_received(:perform_later).with(run.id)
+  end
+
   it "preserves completed tool effects when cancelled" do
     stub_replies tool_call(Examples::RenameChatTool.tool_name, title: "Kept title"), "Done."
     allow_any_instance_of(ToolsetService).to receive(:tool_classes).and_return([Examples::RenameChatTool])

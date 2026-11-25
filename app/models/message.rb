@@ -8,6 +8,8 @@ class Message < ApplicationRecord
   
   belongs_to :user, optional: true  # Optional - only for user_submitted messages
   belongs_to :member, optional: true  # Optional - only for user_submitted messages
+  has_many :triggered_chat_runs, class_name: "ChatRun", foreign_key: :input_message_id,
+    inverse_of: :input_message, dependent: :nullify
   
   # File attachments - passed directly to ruby_llm via chat.ask(with: blobs)
   has_many_attached :attachments, dependent: :purge_later

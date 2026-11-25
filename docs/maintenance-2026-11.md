@@ -130,7 +130,15 @@ See [native agents](https://rubyllm.com/agents/) and
 [durable agents](https://rubyllm.com/durable-agents-overview/). Library primitives
 do not replace workspace authorization, business idempotency or delivery policy.
 
-## Three proposed additions (not implemented)
+## Follow-up foundations
+
+The following historical proposals were implemented in the agent foundations
+branch: named purposes, durable dispatch/recovery, and authenticated native chat
+files/artifacts. See [agent foundations](agent-foundations.md) for current
+behavior and validation. MCP/skills policies and sandbox execution remain
+application-specific. The proposal text below records the original gaps.
+
+### Original proposal
 
 1. **Named chat purposes backed by native agents — medium, 8–12 files.**
    Persist an allowlisted purpose key on `Chat`, then bind the corresponding

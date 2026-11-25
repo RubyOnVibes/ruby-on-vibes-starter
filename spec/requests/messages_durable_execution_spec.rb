@@ -18,6 +18,13 @@ RSpec.describe "Submitting durable chat turns", type: :request do
     end
   end
 
+  it "waits for a cancelled native claim to finish before accepting another message" do
+    chat.chat_runs.create!(status: :cancelled, initiated_by_member: members(:alice_personal_member))
+    chat.update!(claim_token: "stopping-worker", claimed_until: 1.minute.from_now)
+    expect { post "/chats/#{chat.to_param}/messages", params: { content: "New request" }, as: :json }.not_to change(Message, :count)
+    expect(response).to have_http_status(:conflict)
+  end
+
   it "persists dispatch intent and sender before enqueueing" do
     post "/chats/#{chat.to_param}/messages", params: { content: "New request" }, as: :json
     expect(response).to have_http_status(:ok)

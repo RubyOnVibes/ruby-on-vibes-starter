@@ -25,7 +25,7 @@ class ChatRun < ApplicationRecord
   class ToolCallAlreadyDecided < StandardError; end
 
   belongs_to :chat
-  belongs_to :input_message, class_name: "Message", optional: true
+  belongs_to :input_message, class_name: "Message", inverse_of: :triggered_chat_runs, optional: true
   validate :input_message_belongs_to_chat
   belongs_to :initiated_by_member, class_name: "Member", optional: true
   has_many :owned_llm_usages, class_name: "RubyLLM::ActiveRecord::Usage", as: :owner, dependent: :nullify
