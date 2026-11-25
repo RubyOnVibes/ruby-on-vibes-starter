@@ -16,8 +16,8 @@ require_relative "../lib/concise_errors"
 
 module RubyOnVibesTemplate
   class Application < Rails::Application
-    # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 8.0
+    # New applications use the defaults of the Rails version shipped here.
+    config.load_defaults 8.1
 
     config.active_record.permanent_connection_checkout = :disallowed
     # Config Falcon (DB) isolation https://www.youtube.com/watch?v=8-o1XR070g0&t=414s

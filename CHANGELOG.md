@@ -8,6 +8,7 @@
 - Admit scheduled and webhook triggers through a deduplicated delivery inbox, including events received while a chat is busy.
 - Keep untrusted mentioned-record and summary content out of application instructions; reduce the default assistant context and use generic unexpected-error responses.
 - Align the guides and coding-agent conventions with native purposes, tools and task execution.
+- Use Rails 8.1 application defaults for fresh applications.
 - Clear the existing style-lint backlog using the repository's Rails rules.
 
 This revision targets fresh applications. The fresh schema and migration chain omit the prototype task storage.
