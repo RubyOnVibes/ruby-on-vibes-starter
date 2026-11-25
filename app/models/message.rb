@@ -28,6 +28,13 @@ class Message < ApplicationRecord
   # Broadcast new messages to chat stream
   # Skip for user_submitted messages - they get broadcast_full_replace after mentions/attachments
   after_create_commit -> { broadcast_append_to_chat unless skip_initial_broadcast? }
+
+  # The starter's React adapter reads every role from one shared Turbo partial.
+  # RubyLLM's generated chat UI uses role-specific partials; opt into our own
+  # rendering contract for render(message) and render(collection) as well.
+  def to_partial_path
+    "messages/message"
+  end
   
   # Broadcast methods - use string stream names (not GlobalID)
   
