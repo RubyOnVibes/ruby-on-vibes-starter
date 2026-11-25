@@ -51,10 +51,11 @@ Rails.application.configure do
   config.action_dispatch.default_headers.delete('X-Frame-Options')
 
   # Set localhost to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = {host: "localhost", port: ENV.fetch("PORT", 3001).to_i}
+  web_port = ENV.fetch("WEB_PORT") { ENV.fetch("PORT", 3000) }.to_i
+  config.action_mailer.default_url_options = {host: "localhost", port: web_port}
 
   # Set default URL options for route helpers (used in jobs, etc.)
-  Rails.application.routes.default_url_options = {host: "localhost", port: ENV.fetch("PORT", 3001).to_i}
+  Rails.application.routes.default_url_options = {host: "localhost", port: web_port}
 
   config.action_mailer.delivery_method = :mailbin
   

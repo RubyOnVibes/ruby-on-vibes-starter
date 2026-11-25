@@ -155,6 +155,7 @@ module RubyOnVibes
 
   # True when RubyLLM is enabled
   def self.llm?
+    return false if ENV['LLMS_ENABLED'] == 'false'
     return true if ENV['LLMS_ENABLED'] == 'true' # allows dev env override for rapid template iteration
     
     proxy_enabled = true # Ada, Claude (agents) etc. — LLM features enabled by default via platform proxy — change to false to disable for apps with no AI component.

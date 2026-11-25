@@ -1,9 +1,30 @@
 # frozen_string_literal: true
 
-require 'generators/ruby_llm/upgrade/legacy_content_sql'
-
 class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
   disable_ddl_transaction!
+
+  # Keep this historical migration replayable after RubyLLM 2.0's migration
+  # helpers were removed. Adapted from RubyLLM 2.0 (MIT), LegacyContentSQL.
+  class LegacyContentSQL
+    SPACE = [9, 10, 11, 12, 13, 32, 133, 160, 5760, *8192..8202, 8232, 8233, 8239, 8287, 12_288].pack('U*').freeze
+
+    def initialize(connection)
+      @connection = connection
+    end
+
+    def render(content:, raw:)
+      normalized, rendered, nonblank = case @connection.adapter_name
+      when 'PostgreSQL'
+        ["(#{raw}::jsonb)::text", "#{raw}::text", "btrim(#{raw}::jsonb #>> '{}', #{@connection.quote(SPACE)}) <> ''"]
+      when 'Mysql2'
+        ["CAST(#{raw} AS CHAR)", "CAST(#{raw} AS CHAR)", "JSON_UNQUOTE(#{raw}) NOT REGEXP '^[[:space:]]*$'"]
+      else
+        ["json(#{raw})", raw, "trim(json_extract(#{raw}, '$'), #{@connection.quote(SPACE)}) <> ''"]
+      end
+      present = "#{normalized} NOT IN ('null', 'false', '[]', '{}') AND #{nonblank}"
+      "CASE WHEN #{present} THEN #{rendered} ELSE #{content} END"
+    end
+  end
 
   BATCH_SIZE = 10_000
   PROGRESS_TABLE = :ruby_llm_v2_backfills
@@ -57,7 +78,7 @@ class BackfillRubyLlmV2Data < ActiveRecord::Migration[8.1]
       raw_content = message_value(:raw_content)
       content = message_value(:content)
       structured_content = content_raw
-      rendered_content = RubyLLM::Generators::LegacyContentSQL.new(connection).render(content: content, raw: content_raw)
+      rendered_content = LegacyContentSQL.new(connection).render(content: content, raw: content_raw)
       execute <<~SQL
         UPDATE #{quote_table(:messages)} AS legacy_messages
            SET #{quote_column(:raw_content)} = COALESCE(#{raw_content}, #{structured_content}),

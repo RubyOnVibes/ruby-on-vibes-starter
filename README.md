@@ -17,7 +17,7 @@ Rails app
 
 An opinionated, AI-enhanced Rails 8 template for building agentic web applications. Chat with an AI assistant that can look things up, run background tasks autonomously, track its work, and report back — all on production-ready infrastructure.
 
-Built on Falcon (async fiber-based web server), SolidQueue (background jobs), RubyLLM (multi-provider AI), and Inertia.js (React islands + Turbo).
+Built on Falcon (async fiber-based web server), SolidQueue (background jobs), RubyLLM 2.2 (multi-provider AI), and ERB/Turbo with React islands and Inertia pages.
 
 ## Community
 
@@ -29,27 +29,53 @@ Built on Falcon (async fiber-based web server), SolidQueue (background jobs), Ru
 ```bash
 git clone <your-fork-url>
 cd <your-app>
+cp .env.example .env
+# Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env before starting the app.
 bin/setup        # bundle, db:prepare, JS deps
 bin/dev          # Falcon + SolidQueue + Vite + Tailwind
 ```
 
 Open http://localhost:3000.
 
-Set at least one LLM provider key before chat will work:
+The provider key enables local chat without a platform account or mounted
+runtime. Use ENV variables (a local uncommitted `.env`, or the hosted Secrets
+menu), not Rails credentials. `LLMS_ENABLED=true` only exposes the feature; it
+does not supply provider credentials. Keep hosted platform variables unset for
+normal local development.
 
-```bash
-cp .env.example .env
-# then add ANTHROPIC_API_KEY=... or OPENAI_API_KEY=... or GEMINI_API_KEY=...
-```
+Set `LLM_MODEL` to override the default model and configure the key for its
+provider. `LLMS_ENABLED=false` disables the default chat and task feature gates,
+even with keys configured. `AGENTS_ENABLED=true` is a separate development
+override that still exposes persistent agents.
+These flags do not block direct RubyLLM calls from application code. Settings
+take effect when the application restarts.
 
 ## Architecture
 
 - **Fiber-based chat**: `ChatStreamJob` runs as an in-process fiber via `async-job`. LLM streaming, tool calls, and HTTP requests all yield during I/O — no thread starvation, no blocked workers.
 - **Background agent tasks**: Long-running work runs in SolidQueue as a separate process. Progress tracking, retries, cancellation, and audit trails built in.
-- **Human-approved actions**: Consequential RubyLLM tools pause durably for an authorized approve/deny decision before execution.
+- **Human decisions**: RubyLLM tools can pause for approval or a question. The chat UI supports approvals, typed form fields, and URL requests with workspace authorization.
 - **Run accounting**: Every provider attempt, token bucket, cache hit, and defensible cost is attributed to its ChatRun.
 - **Multi-tenant**: Workspaces, members, roles, and permissions from day one.
-- **Any LLM provider**: Anthropic, OpenAI, Google, local models via Ollama — set an env var and go.
+- **Direct provider access**: Anthropic and OpenAI keys work without the hosted platform. Other RubyLLM providers need explicit configuration and application checks.
+
+## Using RubyLLM
+
+Start with [Building with Agents](docs/building_with_agents.md) for a structured
+output example, the native `ApplicationAgent` base, tools, background tasks,
+provider-free integration tests, and an opt-in evaluation with deterministic
+checks. Library capabilities such as MCP, skills, file stores, and sandboxed
+code execution are available to configure; they are not all enabled in the
+starter's chat UI by installing the gem.
+
+The template already includes Schematist through RubyLLM. Add optional companion
+tools only for a concrete feature: `mxc` for sandboxed execution, the `skill` CLI
+for installing skills, or an OpenTelemetry SDK/exporter for a tracing backend.
+Do not install a second MCP or evaluation framework for features already in core.
+
+See [RubyLLM upgrades and platform compatibility](docs/rubyllm-upgrade.md) before
+updating an existing database or the separate Ruby on Vibes platform. The
+platform's dependency lock and embedded template do not change automatically.
 
 ## Documentation
 
@@ -62,6 +88,8 @@ How to add AI-powered capabilities using tools and agent tasks.
 **Location:** `docs/building_with_agents.md`
 
 **Covers:**
+
+- Native RubyLLM agents, structured output, test helpers, and evaluations
 - Tools vs Agent Tasks — when to use each
 - Creating inline tools (fast, run in the chat fiber)
 - Creating agent tasks (background, long-running, with retries and progress)
@@ -75,6 +103,7 @@ Guide to the built-in multitenancy system.
 **Location:** `docs/workspaces.md`
 
 **Covers:**
+
 - Workspace and Member models
 - Personal vs Team workspaces
 - Roles, permissions, invitations
@@ -87,6 +116,7 @@ Guide to the built-in multitenancy system.
 - `docs/mentionable.md` — Mentionable module for chat references
 - `docs/notifications.md` — Notification system
 - `docs/llm_release_exercises.md` — live-model release checklist for tools, approvals, tasks, accounting, caching, and compaction
+- `docs/rubyllm-upgrade.md` — starter migrations, platform upgrade stages, and a canonical local template source
 - `docs/queue.md` — SolidQueue configuration
 - `docs/cache.md` — SolidCache configuration
 - `docs/ssr.md` — Server-side rendering with Inertia
@@ -102,6 +132,7 @@ Guide to the built-in multitenancy system.
 
 ```
 app/tools/           — AI tool classes (RubyLLM::Tool subclasses)
+app/agents/          — Native RubyLLM agent classes (ApplicationAgent subclasses)
 app/jobs/            — Background jobs (AgentTaskJob subclasses for tasks)
 app/models/          — Models including AgentTask, AgentTaskEffect
 app/services/        — ToolsetService (tool registration), business logic

@@ -65,6 +65,8 @@ Rails.application.routes.draw do
       post :continue
       post "tool_approvals/:tool_call_id/approve", action: :approve_tool, as: :approve_tool
       post "tool_approvals/:tool_call_id/deny", action: :deny_tool, as: :deny_tool
+      post "questions/answer", action: :answer_question, as: :answer_question
+      post "questions/decline", action: :decline_question, as: :decline_question
     end
   end
 

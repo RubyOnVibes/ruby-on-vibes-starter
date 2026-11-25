@@ -8,7 +8,7 @@
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
-ARG RUBY_VERSION=4.0.7
+ARG RUBY_VERSION=4.0.10
 FROM docker.io/library/node:24.21.0-bookworm-slim AS node
 
 FROM docker.io/library/ruby:${RUBY_VERSION}-bookworm AS base
@@ -52,7 +52,7 @@ COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production=false
 
 # Install application gems (standard Rails - no gemspec needed)
-COPY Gemfile Gemfile.lock ./
+COPY .ruby-version Gemfile Gemfile.lock ./
 RUN bundle config set build.openssl --with-openssl-dir=/usr && \
     bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Streamdown } from 'streamdown'
 import { code } from '@streamdown/code'
 import { MentionChip } from './MentionChip'
+import ToolQuestionCard from './ToolQuestionCard'
 
 function StreamdownWrapper({
   children,
@@ -549,8 +550,8 @@ function ToolApprovalCard({ toolCall }) {
           <span
             className="rounded-full px-2 py-1 text-xs font-medium"
             style={{
-              backgroundColor: status === 'approved' ? 'color-mix(in srgb, #16a34a 15%, transparent)' : 'color-mix(in srgb, #dc2626 15%, transparent)',
-              color: status === 'approved' ? '#16a34a' : '#dc2626'
+              backgroundColor: status === 'approved' ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'color-mix(in srgb, var(--color-destructive) 15%, transparent)',
+              color: status === 'approved' ? 'var(--color-success)' : 'var(--color-destructive)'
             }}
           >
             {status === 'approved' ? 'Approved' : 'Denied'}
@@ -588,7 +589,7 @@ function ToolApprovalCard({ toolCall }) {
         </div>
       )}
 
-      {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
+      {error && <div className="mt-2 text-xs text-destructive" role="alert">{error}</div>}
     </div>
   )
 }
@@ -667,8 +668,11 @@ export function MessageBubble({
   const hasContent = message.content?.trim().length > 0
   const approvalToolCalls = (message.tool_calls || []).filter((toolCall) => toolCall.requiresApproval)
   const hasApprovalCards = approvalToolCalls.length > 0
+  const toolQuestions = (message.tool_calls || []).flatMap((toolCall) =>
+    (toolCall.questions || []).map((question) => ({ question, chatRunId: toolCall.chatRunId }))
+  )
 
-  if (!hasContent && !hasApprovalCards) return null
+  if (!hasContent && !hasApprovalCards && toolQuestions.length === 0) return null
 
   if (isSystemEvent) {
     return (
@@ -810,6 +814,10 @@ export function MessageBubble({
 
           {approvalToolCalls.map((toolCall) => (
             <ToolApprovalCard key={toolCall.id} toolCall={toolCall} />
+          ))}
+
+          {toolQuestions.map(({ question, chatRunId }) => (
+            <ToolQuestionCard key={question.id} question={question} chatRunId={chatRunId} />
           ))}
 
           {message.attachments && message.attachments.length > 0 && (

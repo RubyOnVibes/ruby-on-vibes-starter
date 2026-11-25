@@ -55,6 +55,14 @@ class ChatRunsController < ApplicationController
     decide_tool("denied")
   end
 
+  def answer_question
+    decide_question("answered", answer: params[:answer])
+  end
+
+  def decline_question
+    decide_question("declined", note: params[:note])
+  end
+
   private
 
   def set_chat_run
@@ -62,12 +70,17 @@ class ChatRunsController < ApplicationController
   end
 
   def decide_tool(decision)
+    decide_question(decision, question_id: params[:tool_call_id], approval_only: true)
+  end
+
+  def decide_question(decision, question_id: params[:question_id], **options)
     authorize @chat_run.chat, :approve_tools?
 
-    tool_call, should_resume = @chat_run.decide_tool_call!(
-      params[:tool_call_id],
+    tool_call, should_resume = @chat_run.answer_question!(
+      question_id,
       decision: decision,
-      member: current_member
+      member: current_member,
+      **options
     )
 
     tool_call.message.broadcast_upsert_to_chat! if tool_call.message.respond_to?(:broadcast_upsert_to_chat!)
@@ -87,9 +100,12 @@ class ChatRunsController < ApplicationController
     render json: {
       status: decision,
       resuming: should_resume,
-      pending_approvals: @chat_run.pending_tool_approvals.size
+      pending_approvals: @chat_run.pending_tool_approvals.size,
+      pending_questions: @chat_run.pending_questions.size
     }, status: :ok
-  rescue ChatRun::ToolCallAlreadyDecided
+  rescue ChatRun::ToolCallAlreadyDecided, RubyLLM::ToolCallRunningError
     render json: { error: "Tool call has already been decided" }, status: :conflict
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_content
   end
 end

@@ -2,5 +2,5 @@ css: bin/rails "tailwindcss:watch[always]"
 vite: bin/vite dev
 islands: yarn watch:islands
 ssr: bin/dev-ssr
-web: OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES bin/rails server -p 3001
+web: OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES bin/rails server -p ${WEB_PORT:-3000}
 worker: bin/jobs

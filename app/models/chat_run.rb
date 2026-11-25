@@ -26,6 +26,7 @@ class ChatRun < ApplicationRecord
 
   belongs_to :chat
   belongs_to :initiated_by_member, class_name: "Member", optional: true
+  has_many :owned_llm_usages, class_name: "RubyLLM::ActiveRecord::Usage", as: :owner, dependent: :nullify
 
   enum :status, {
     pending: 0,
@@ -67,31 +68,42 @@ class ChatRun < ApplicationRecord
   def decide_tool_call!(tool_call_id, decision:, member:)
     raise ArgumentError, "invalid decision" unless %w[approved denied].include?(decision.to_s)
 
+    answer_question!(tool_call_id, member: member, decision: decision, approval_only: true)
+  end
+
+  def answer_question!(question_id, member:, decision: "answered", answer: nil, note: nil, approval_only: false)
+    raise ArgumentError, "invalid decision" unless %w[answered approved denied declined].include?(decision.to_s)
+
     should_resume = false
     tool_call = nil
 
     with_lock do
       raise ActiveRecord::RecordNotFound unless status_awaiting_approval?
 
-      tool_call = approval_tool_calls.find { |candidate| candidate.tool_call_id == tool_call_id.to_s }
-      raise ActiveRecord::RecordNotFound unless tool_call
-      raise ActiveRecord::RecordNotFound unless tool_call.metadata["requires_approval"]
-      raise ToolCallAlreadyDecided if tool_call.approval.present?
+      question = pending_questions.find { |candidate| candidate.id == question_id.to_s }
+      raise ActiveRecord::RecordNotFound unless question
+      raise ActiveRecord::RecordNotFound if approval_only && !question.approval?
+      tool_call = approval_tool_calls.find { |candidate| candidate.tool_call_id == question.tool_call.id }
 
       requester_id = tool_call.metadata["requester_member_id"]&.to_i
       unless member && (requester_id == member.id || chat.owner?(member))
         raise Pundit::NotAuthorizedError, "not allowed to decide this tool call"
       end
 
-      tool_call.update!(
-        approval: decision,
+      case decision.to_s
+      when "approved" then question.approve
+      when "denied", "declined" then question.decline(note)
+      else question.answer(answer)
+      end
+
+      tool_call.reload.update!(
         metadata: tool_call.metadata.merge(
           "decided_by_member_id" => member.id,
           "decided_at" => Time.current.iso8601
         )
       )
 
-      if pending_tool_approvals.empty?
+      if pending_questions.empty?
         update!(status: :running)
         should_resume = true
       end
@@ -112,15 +124,33 @@ class ChatRun < ApplicationRecord
 
   def pending_tool_approvals
     approval_tool_calls.select do |tool_call|
-      tool_call.metadata["requires_approval"] && tool_call.approval.blank?
+      tool_call.metadata["requires_approval"] && tool_call.approval.in?([nil, "pending"])
     end
   end
 
-  # Snapshot provider attempts attributable to this run. A chat can have only
-  # one active run, so the run's time window is an unambiguous accounting scope,
-  # including retries and approval/task continuations.
+  # Use RubyLLM's persisted questions, scoped to this run. Retain the ability to
+  # decide approvals parked by 2.0, which had no native "pending" marker.
+  def pending_questions
+    calls = approval_tool_calls
+    call_ids = calls.map(&:tool_call_id)
+    questions = chat.pending_questions.select { |question| call_ids.include?(question.tool_call.id) }
+    pending_tool_approvals.each do |call|
+      next if call.result_id.present? || questions.any? { |question| question.id == call.tool_call_id }
+
+      questions << RubyLLM::Question.approval(call.to_llm, chat: chat)
+    end
+    questions
+  end
+
+  # Native ownership is authoritative, including compaction and continuation
+  # attempts. Use the time window only for legacy usages without an owner: a
+  # superseded run can still be releasing its claim when the next run starts.
   def capture_usage!
-    usages = chat.ruby_llm_usages.where("created_at >= ?", created_at).chronological.to_a
+    records = RubyLLM::ActiveRecord::Usage
+    usages = records.where(id: owned_llm_usages.select(:id))
+      .or(records.where(id: chat.ruby_llm_usages.where(owner_type: nil, owner_id: nil)
+        .where(created_at: created_at..(active? ? Time.current : ended_at)).select(:id)))
+      .chronological.to_a
     return usage_summary if usages.empty?
 
     tokens = RubyLLM::Tokens.aggregate(usages.map(&:tokens))
@@ -137,6 +167,8 @@ class ChatRun < ApplicationRecord
       usage_metadata: {
         "providers" => usages.map(&:provider).uniq,
         "models" => usages.map(&:model).uniq,
+        "operations" => usages.map(&:operation).uniq,
+        "server_tool_use" => tokens.server_tool_use,
         "statuses" => usages.group_by(&:status).transform_values(&:size)
       },
       updated_at: Time.current
@@ -177,6 +209,7 @@ class ChatRun < ApplicationRecord
     return true if status_completed? || status_cancelled?
 
     transaction do
+      chat.cancel
       update!(status: :cancelled, cancelled_by: cancelled_by)
 
       # Cancel all active agent tasks for this chat.

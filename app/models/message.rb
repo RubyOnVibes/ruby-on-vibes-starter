@@ -3,7 +3,7 @@
 class Message < ApplicationRecord
   include ActionView::RecordIdentifier
   
-  acts_as_message
+  acts_as_message broadcasts: false
   # broadcasts_to :chat  # Don't use - creates GlobalID stream name mismatch
   
   belongs_to :user, optional: true  # Optional - only for user_submitted messages
@@ -164,11 +164,27 @@ class Message < ApplicationRecord
         id: tool_call.tool_call_id,
         name: tool_call.name,
         arguments: tool_call.arguments || {},
-        approval: tool_call.approval,
+        approval: tool_call.approval == "pending" ? nil : tool_call.approval,
         requiresApproval: metadata["requires_approval"] == true,
         chatRunId: metadata["chat_run_id"],
         requestedAt: metadata["requested_at"],
-        decidedAt: metadata["decided_at"]
+        decidedAt: metadata["decided_at"],
+        questions: serialize_questions(tool_call)
+      }
+    end
+  end
+
+  def serialize_questions(tool_call)
+    Array(tool_call.mcp_state&.fetch("requests", nil)).map do |data|
+      question = RubyLLM::Question.from_h(data, tool_call: tool_call.to_llm)
+      response = question.response
+      {
+        id: question.id,
+        kind: question.url? ? "url" : "form",
+        message: question.message,
+        url: question.url,
+        fields: question.fields.map(&:to_h),
+        status: response.nil? ? "pending" : (response["action"] == "accept" ? "answered" : "declined")
       }
     end
   end

@@ -10,6 +10,14 @@ This file provides essential context for AI coding agents working on this Rails 
 
 ---
 
+## Cloud deployment on shared development computers
+
+- Verify the intended account and actual organization before running Fly mutations. The cached CLI login may belong to another project; `personal` is relative to that login.
+- Use project-scoped credentials and an isolated Fly configuration. Do not switch the machine's global Fly login unless the user requests it.
+- When deploying through the sibling Ruby on Vibes platform, follow its local deployment runbook and account-isolation settings. Standalone Fly commands do not automatically inherit the platform's protections.
+
+---
+
 ## AI Systems Architecture
 
 This app ships with AI-native infrastructure. These systems are dormant until used — no overhead if unused.
@@ -33,7 +41,7 @@ This app ships with AI-native infrastructure. These systems are dormant until us
 
 ## Stack Overview
 
-- **Rails 8.1**, Ruby 4.0.3, Vite for JS, Propshaft for assets
+- **Rails 8.1**, Ruby 4.0.10, Vite for JS, Propshaft for assets
 - **Falcon** web server with **async-job-adapter** for LLM streaming
 - **SolidQueue** for most background jobs, async adapter for IO-heavy LLM work
 - **SQLite** (development) or **PostgreSQL** (production)
@@ -117,66 +125,65 @@ islands/NotificationsIconIsland.jsx   Navbar.jsx (Inertia)
 
 ## LLM/AI Feature Configuration
 
-This app uses **RubyLLM** for AI features (chatbots, assistants, content generation, etc.) via the platform's AI proxy. **LLM features are enabled by default.**
+This app uses **RubyLLM 2.2**. Local applications can use their own provider
+keys; the hosted platform proxy is optional. Keep AI enabled for applications
+that use it, including applications with their own keys.
 
-### The Toggle: `lib/ruby_on_vibes.rb`
+### Provider configuration and feature gates
 
-LLM features are controlled by a single variable in `lib/ruby_on_vibes.rb`:
+`config/initializers/ruby_llm.rb` configures Anthropic and OpenAI from ENV.
+Use `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in a local uncommitted `.env` or the
+hosted Secrets menu. Other RubyLLM providers require explicit configuration;
+adding a similarly named environment variable alone is not an integration.
+`LLM_MODEL` overrides the default model; its provider must have credentials.
+There is no `LLM_PROVIDER` environment setting in this starter.
 
-```ruby
-def self.llm?
-  proxy_enabled = true  # ← CHANGE THIS to false to disable LLM features
-  return proxy_enabled && ENV["USE_MOUNTED_VIBES"] == "true" && ENV["VIBES_AI_PROXY_URL"].present?
-  # ... fallback logic below
-end
-```
+`lib/ruby_on_vibes.rb` owns the application feature gates:
 
-**To disable LLM features**: Change `proxy_enabled = true` to `proxy_enabled = false`
+| Method | Purpose |
+| --- | --- |
+| `RubyOnVibes.llm?` | Whether the application exposes its LLM features |
+| `RubyOnVibes.chat?` | Chat UI visibility; defaults to `llm?` |
+| `RubyOnVibes.agent_tasks?` | Background-task feature visibility; defaults to `chat?` |
+| `RubyOnVibes.agents?` | Persistent application agents; independently gated below |
 
-**To re-enable LLM features**: Change `proxy_enabled = false` to `proxy_enabled = true`
+`LLMS_ENABLED=true` can expose the UI during development, but does not provide
+credentials or make provider calls work. `LLMS_ENABLED=false` explicitly
+disables the default chat and task feature gates even when keys are configured.
+`AGENTS_ENABLED=true` is a separate development override: it still exposes
+persistent agents despite `LLMS_ENABLED=false`. Leave `LLMS_ENABLED` unset to
+detect configured providers. Restart after changing environment settings.
+Feature visibility does not unload the RubyLLM gem or prevent arbitrary
+application code from calling it. Customize `chat?` separately when the
+application needs AI services without the conversation UI.
 
-### What This Controls
+In mounted mode, `USE_MOUNTED_VIBES=true`, `VIBES_AI_PROXY_URL`, and
+`VIBES_API_TOKEN` configure the Anthropic proxy. A direct Anthropic key takes
+precedence. Normal local development does not require these platform variables.
 
-| Method | What It Gates |
-|--------|---------------|
-| `RubyOnVibes.llm?` | All LLM/AI functionality (RubyLLM gem access) |
-| `RubyOnVibes.chat?` | Chat UI visibility (defaults to same as `llm?`) |
+### Use the native API and the application lifecycle deliberately
 
-**Note**: `chat?` calls `llm?` by default. If you need chat UI without full LLM access (or vice versa), you can customize the `chat?` method separately.
+- Subclass `ApplicationAgent` for native `RubyLLM::Agent` behavior. The database
+  `Agent` model is the separate workspace/scheduling system.
+- Use `Schematist::Schema` and `response.parsed` for structured output.
+- Register UI tools in `ToolsetService`; the chat job rebuilds them each run.
+- RubyLLM 2.2 uses `pending_questions`, `approve`, `decline`, and `answer`.
+  Keep workspace authorization and audit metadata in `ChatRun`; do not write
+  internal tool approval columns directly.
+- Use `RubyLLM.with_owner(record)` for usage outside the built-in chat job.
+  An isolated native chat does not automatically create a `ChatRun` or enforce
+  workspace access.
+- Use `RubyLLM::TestHelper` for provider-free conversation-loop tests and
+  `RubyLLM::Evaluation` for explicitly invoked quality checks. Do not make live
+  evaluation requests part of the default test suite accidentally.
+- Core MCP, skills, file stores, and code execution require application setup.
+  Do not add `ruby_llm-mcp` alongside core MCP, or the old evaluation/tracing
+  placeholder packages. Add `mxc` only when sandboxed code execution is needed.
 
-### When to Disable LLM Features
-
-**KEEP ENABLED** (default, `proxy_enabled = true`) for most apps — anything that could benefit from AI:
-- AI chatbots or assistants
-- Content generation (text, summaries, translations)
-- AI-powered search or recommendations
-- Natural language interfaces
-- Any feature using RubyLLM gem
-
-**DISABLE** (`proxy_enabled = false`) only for apps with clearly no AI component:
-- Pure static sites or brochure pages
-- Simple CRUD apps with zero intelligence features
-- Apps where users bring their own API keys (use direct `ANTHROPIC_API_KEY` instead)
-
-When in doubt, leave it enabled — there's no cost until API calls are actually made.
-
-### How the Proxy Works
-
-When `proxy_enabled = true` and running on the platform:
-1. `config/initializers/ruby_llm.rb` configures RubyLLM to use `VIBES_AI_PROXY_URL`
-2. API calls route through platform proxy (uses `VIBES_API_TOKEN` for auth)
-3. Usage is billed via platform credits
-4. Model allowlist is enforced by proxy
-
-Users can bypass the proxy by setting their own `ANTHROPIC_API_KEY` in Secrets.
-
-### Example: User Asks to Enable/Disable AI
-
-**User says**: "Disable AI features" or "Remove the chat"
-→ Edit `lib/ruby_on_vibes.rb`, change `proxy_enabled = true` to `proxy_enabled = false`
-
-**User says**: "Enable AI features" or "Add chatbot support"
-→ Edit `lib/ruby_on_vibes.rb`, change `proxy_enabled = false` to `proxy_enabled = true`
+Read `docs/building_with_agents.md` for examples and
+`docs/rubyllm-upgrade.md` for migrations and platform compatibility. The sibling
+platform and its embedded template have independent dependencies; a starter
+upgrade does not upgrade either automatically.
 
 ### Persistent Agents Toggle
 
@@ -191,6 +198,9 @@ end
 ```
 
 **To disable persistent agents**: Change `agents_enabled = true` to `agents_enabled = false`
+
+Unset `AGENTS_ENABLED=true` as well; that development override takes precedence
+over the code flag and the default chat/task gates.
 
 **To re-enable persistent agents**: Change `agents_enabled = false` to `agents_enabled = true`
 

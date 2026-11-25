@@ -43,6 +43,7 @@ RSpec.describe ChatStreamJob, type: :job do
       :anthropic
     ])
     allow(RubyLLM).to receive(:chat).and_return(double("RubyLLM::Chat").as_null_object)
+    allow_any_instance_of(Chat).to receive(:with_tool_options) { |instance, **_| instance }
 
     # validate_mentionable_contexts only runs in development
     allow(Rails.env).to receive(:development?).and_return(false)
@@ -84,8 +85,7 @@ RSpec.describe ChatStreamJob, type: :job do
       callbacks[:fallback_models] = models
       instance
     end
-    allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(false)
-    allow_any_instance_of(Chat).to receive(:pending_approvals).and_return([])
+    allow_any_instance_of(Chat).to receive(:pending_questions).and_return([])
     callbacks
   end
 
@@ -420,8 +420,8 @@ RSpec.describe ChatStreamJob, type: :job do
       )
 
       stub_chat_streaming(chunks: [])
-      allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(true)
-      allow_any_instance_of(Chat).to receive(:pending_approvals).and_return([tool_call])
+      question = RubyLLM::Question.approval(tool_call.to_llm, chat: chat)
+      allow_any_instance_of(Chat).to receive(:pending_questions).and_return([question])
 
       described_class.perform_now(chat.id, user_message.id, run.id)
 
@@ -437,7 +437,6 @@ RSpec.describe ChatStreamJob, type: :job do
       run = create_chat_run!
       callbacks = stub_chat_streaming(chunks: ["Renamed."])
       expect_any_instance_of(Chat).not_to receive(:recover_from_tool_errors!)
-      allow_any_instance_of(Chat).to receive(:awaiting_approval?).and_return(false)
 
       expect {
         described_class.perform_now(chat.id, nil, run.id, {

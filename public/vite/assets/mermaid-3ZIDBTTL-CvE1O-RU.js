@@ -1,1 +1,0 @@
-import{n as e}from"./islands-D0vHCeqz.js";export{e as Mermaid};

@@ -1,11 +1,13 @@
 source "https://rubygems.org"
 
+ruby file: ".ruby-version"
+
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.4"
+gem "rails", "~> 8.1.4", ">= 8.1.4.1"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use sqlite3 as the database for Active Record
-gem "sqlite3", ">= 2.1"
+gem "sqlite3", ">= 2.10.2"
 # Use PostgreSQL as the database for Active Record (optional upgrade from SQLite)
 gem "pg", "~> 1.6", ">= 1.6.2"
 # Use the Falcon web server [https://github.com/socketry/falcon]
@@ -162,7 +164,7 @@ gem "refer"
 gem "resend"
 
 # https://github.com/crmne/ruby_llm
-gem "ruby_llm", "2.0.0"
+gem "ruby_llm", "~> 2.2.3"
 
 # https://github.com/getsentry/sentry-ruby
 # gem "sentry-rails"

@@ -84,6 +84,34 @@ RSpec.describe ChatRun, type: :model do
   end
 
   describe '#capture_usage!' do
+    it 'includes run-owned calls outside the chat without double counting chat attempts' do
+      run = create_run!(status: :running)
+      attributes = { operation: "chat", provider: "anthropic", model: "claude-sonnet-4-6",
+                     status: "succeeded", total_cost: "0.001", owner: run }
+      RubyLLM::ActiveRecord::Usage.create!(**attributes, chat: chat)
+      RubyLLM::ActiveRecord::Usage.create!(**attributes)
+
+      expect(run.capture_usage!).to include("attempts" => 2, "total_cost" => "0.002")
+    end
+
+    it 'does not attribute later chat usage to a completed run' do
+      run = create_run!(status: :completed, completed_at: 1.minute.ago, created_at: 2.minutes.ago)
+      RubyLLM::ActiveRecord::Usage.create!(chat: chat, operation: "chat", provider: "anthropic",
+        model: "claude-sonnet-4-6", status: "succeeded", total_cost: "0.001")
+
+      expect(run.capture_usage!["attempts"]).to eq(0)
+    end
+
+    it 'does not charge a new run for a superseded run releasing its claim' do
+      previous = create_run!(status: :failed)
+      run = create_run!(status: :pending)
+      RubyLLM::ActiveRecord::Usage.create!(chat: chat, owner: previous, operation: "chat", provider: "anthropic",
+        model: "claude-sonnet-4-6", status: "succeeded", total_cost: "0.001")
+
+      expect(run.capture_usage!["attempts"]).to eq(0)
+      expect(previous.capture_usage!["attempts"]).to eq(1)
+    end
+
     it 'aggregates all provider attempts during the run' do
       run = create_run!(status: :running)
       2.times do |index|

@@ -7,7 +7,7 @@ class CreateMentions < ActiveRecord::Migration[8.0]
       t.string :sgid, null: false              # GlobalID reference
       t.string :mentionable_type, null: false  # 'Chat', 'User', etc.
       t.string :label, null: false             # Display label
-      t.jsonb :metadata, default: {}           # Extra data
+      t.text :metadata, default: "{}"          # Match the existing schema snapshot
 
       t.timestamps
     end

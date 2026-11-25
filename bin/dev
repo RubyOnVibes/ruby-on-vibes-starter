@@ -7,6 +7,9 @@ fi
 
 # Default to port 3000 if not specified
 export PORT="${PORT:-3000}"
+# Foreman gives each process a different PORT. Keep the web port stable for
+# the server and URL generation in background jobs.
+export WEB_PORT="$PORT"
 
 # Let the debug gem allow remote connections,
 # but avoid loading until `debugger` is called

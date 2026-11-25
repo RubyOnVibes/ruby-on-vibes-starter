@@ -2,18 +2,169 @@
 
 This guide covers how to add AI-powered capabilities to your application using the chat system, tools, and agent tasks.
 
+## RubyLLM 2.2: choose the integration you need
+
+The starter uses RubyLLM 2.2. Configure a provider as described in the
+[README](../README.md#quickstart), then use the smallest building block that
+fits your feature:
+
+| Need | Entry point | What the starter supplies |
+| --- | --- | --- |
+| A typed answer in a normal Rails feature | `RubyLLM.chat.with_schema(...)` | Provider configuration; your controller/service owns permissions and presentation. |
+| A reusable AI behavior | Subclass `ApplicationAgent` | A native `RubyLLM::Agent` base with `chat_class Chat`; plain `.new` agents remain in memory. |
+| User-visible conversation and actions | `Chat`, `ChatStreamJob`, `ToolsetService` | Workspace access, streaming, tool decisions, and `ChatRun` usage. |
+| Long work with progress | `AgentTask` + `AgentTaskJob` | Job retries, cancellation, progress, effects, and conversation continuation. |
+| Scheduled or webhook-triggered workers | The application's `Agent` model | Identity, workspace membership, stored configuration, and scheduling. |
+| Regression measurement | `RubyLLM::Evaluation` | Native library API; add your own dataset and explicit run command. |
+
+The application's database-backed `Agent` is distinct from a Ruby class derived
+from `RubyLLM::Agent`. A standalone `RubyLLM.chat` or native agent call does not
+automatically create a `ChatRun`, enforce workspace access, or appear in the
+starter's chat UI. Attribute usage with `RubyLLM.with_owner(your_record)` when
+calling outside the chat job, and pass only records the current member may use.
+
+Core MCP, skills, file stores, provider-hosted tools, and code execution are
+available to application code. This starter does not automatically connect MCP
+servers, install skills, enable a sandbox, or provide UI for every core feature.
+Add a feature deliberately and exercise its lifecycle through the intended UI
+or job. See [optional dependencies](#optional-companion-tools) below.
+
+For the built-in conversation, `ChatStreamJob#add_tools` rebuilds the toolset
+each run; register tools in `ToolsetService`, and apply additional chat options
+in the job's setup path on every run. An option set on a different in-memory
+chat will not configure the next UI turn. For MCP OAuth, configure Rails Active
+Record encryption from ENV before storing credentials; a credential table alone
+does not configure encryption. Use the [MCP guide](https://rubyllm.com/mcp/)
+for server lifecycle and authentication.
+
+### Tool-loop and logging defaults
+
+`config/initializers/ruby_llm.rb` sets
+`Rails.configuration.x.llm.tool_options = { rounds: 25, calls: 50 }`.
+Both the UI's `ChatStreamJob` and `ApplicationAgent` use these defaults. Native
+agent subclasses can override them with `tool_options`; customize the shared
+configuration for the built-in chat flow. Tool execution remains sequential.
+
+`calls` caps tools executed from one model response. Excess calls receive an
+error result without execution or approval. `rounds` bounds one `complete`
+invocation, including its repeated model/tool loop. A human-question pause or
+another completion resets that counter: these are not total-run, token, or
+spending budgets. The UI marks an exhausted run failed, keeps completed tool
+results and usage, and asks for a new user message before continuing. Native
+agents raise `RubyLLM::ToolRoundLimitError` for their caller to handle.
+
+RubyLLM request/response body logging is disabled with `config.log_bodies = false`.
+Application tools and other loggers still need to avoid logging private data.
+Question dropdowns use RubyLLM's choice titles while submitting the original
+values, including typed values in multi-select questions.
+
+See the [November maintenance review](maintenance-2026-11.md) for the capability
+inventory and proposed lifecycle work. In particular, native deferred tasks
+and automatic recovery of interrupted runs need application integration;
+stored `Agent.schedule` values do not themselves install recurring jobs.
+
+### Structured output and a reusable agent
+
+For example, create a schema and an agent for a narrow extraction task:
+
+```ruby
+# app/schemas/invoice_fields.rb
+class InvoiceFields < Schematist::Schema
+  string :vendor
+  integer :total_cents
+end
+
+# app/agents/invoice_extraction_agent.rb
+class InvoiceExtractionAgent < ApplicationAgent
+  instructions "Extract the invoice vendor and total in integer cents."
+  schema InvoiceFields
+end
+```
+
+`InvoiceExtractionAgent.new.ask(text).parsed` returns the structured Hash;
+`.content` is JSON text. This call uses the configured provider and may incur
+usage charges. Validate business rules before saving its result. Schematist
+describes output shape; it does not establish factual correctness.
+
+### Test behavior without provider requests
+
+RubyLLM's test helper stubs chat replies while retaining the real conversation
+loop. For example, after adding the agent above:
+
+```ruby
+require "rails_helper"
+require "ruby_llm/test_helper"
+
+RSpec.describe InvoiceExtractionAgent do
+  include RubyLLM::TestHelper
+
+  it "returns a parsed invoice" do
+    stub_replies '{"vendor":"Acme","total_cents":12500}'
+    result = described_class.new.ask("Acme invoice, total $125.00")
+    expect(result.parsed).to eq("vendor" => "Acme", "total_cents" => 12500)
+  end
+end
+```
+
+Use `stub_replies tool_call(:your_tool, argument: "value"), "Done"` to exercise
+tool execution. These stubs cover chat requests; operations such as embeddings
+still need their own test doubles. This verifies application behavior, not a
+model's extraction quality.
+
+### Evaluate quality explicitly
+
+Add an opt-in evaluation for real model quality. This example uses deterministic
+checks without a second model grading the answer:
+
+```ruby
+# app/evals/invoice_evaluation.rb
+class InvoiceEvaluation < RubyLLM::Evaluation
+  evaluator false
+
+  def perform(input)
+    unless ENV["RUN_LIVE_LLM_EVALS"] == "true"
+      raise "Set RUN_LIVE_LLM_EVALS=true to allow provider requests"
+    end
+
+    InvoiceExtractionAgent.new.ask(input).parsed
+  end
+
+  def assertions
+    assert_equal expected_output, output
+  end
+end
+```
+
+```yaml
+# app/evals/invoice_evaluation.yml
+cases:
+  - name: simple_invoice
+    inputs: "Invoice from Acme. Total due: $125.00."
+    expected_output:
+      vendor: Acme
+      total_cents: 12500
+```
+
+Run only when you intend to make paid provider calls:
+
+```bash
+RUN_LIVE_LLM_EVALS=true bin/rails "ruby_llm:eval[InvoiceEvaluation]"
+```
+
+`evaluator false` disables grading calls, not the agent call in `perform`.
+The native report records verdicts and usage under `tmp/evaluations`. Keep
+real, reviewed cases in version control and compare the same cases after a
+prompt or model change. Add model grading only when deterministic checks cannot
+express the desired result; inspect grader disagreements yourself. See the
+[evaluation guide](https://rubyllm.com/evaluations/).
+
 ## Architecture Overview
 
 The app uses Ruby's async/fiber ecosystem for concurrency. `ChatStreamJob` runs as an
-in-process fiber via `async-job` — not a thread-based worker. This means:
-
-- **Fibers are lightweight**: ~3μs to allocate (vs ~80μs for threads), ~0.1μs context switch
-- **I/O multiplexing**: One thread monitors thousands of connections via epoll/kqueue
-- **No slot starvation**: Fibers yield during I/O (LLM streaming, HTTP requests), freeing the
-  event loop for other work. Thread-based workers would each hold a database connection and
-  OS thread while waiting for tokens.
-- **Transparent**: Existing Ruby code becomes non-blocking automatically under Falcon + async.
-  No syntax changes, no `await` keywords, no library migrations.
+in-process fiber via `async-job`. Scheduler-compatible I/O yields while waiting
+for LLM responses or HTTP requests. CPU-heavy work and libraries that block the
+scheduler still need a separate worker; using Falcon does not make arbitrary
+Ruby code non-blocking.
 
 The web server (Falcon) and chat jobs share the same fiber scheduler. Tools run inline in the
 chat fiber. Agent tasks run in a separate SolidQueue worker process for true background work.
@@ -110,10 +261,18 @@ end
 ```
 
 The chat loop persists the pending call, parks its `ChatRun` in
-`awaiting_approval`, and renders the exact arguments. Approval or denial can
-survive a refresh or process restart. Approval is consent to attempt the action,
-not authorization: scope records and check permissions again inside the tool.
-Make writes idempotent because any background system can retry after failure.
+`awaiting_approval`, and renders the exact arguments. RubyLLM 2.2 represents
+approvals and tool questions through `pending_questions`; decisions use
+`approve`, `decline`, or `answer`. The starter's question endpoints enforce
+membership and run ownership before passing a decision to RubyLLM. Use those
+endpoints from the UI rather than writing internal approval columns.
+
+Tool questions can request form values or a visit to a server-supplied URL.
+Their saved state survives a refresh. A tool that asks a question executes again
+from the beginning after the answer: ask before performing a side effect.
+Approval is consent to attempt the action, not authorization: scope records and
+check permissions again inside the tool. Make writes idempotent because any
+background system can retry after failure.
 
 `Examples::RenameChatTool` is a reversible reference implementation available
 with `VIBES_DEBUG_TOOLS=true`.
@@ -283,6 +442,34 @@ apply, so confirm cache hits through `ChatRun#cache_read_tokens`.
 Fallbacks apply only to RubyLLM's supported transient failure classes. Configure
 credentials for every listed model and choose models that support the tools and
 modalities your conversation uses.
+
+## Optional companion tools
+
+- **Schematist** is already a RubyLLM dependency. Use `Schematist::Schema`;
+  do not add the legacy `ruby_llm-schema` forwarding gem.
+- **MCP, evaluations, and instrumentation** ship in core. Do not add the old
+  placeholder `ruby_llm-evaluations` or `ruby_llm-opentelemetry` packages.
+  The separate community `ruby_llm-mcp` conflicts with core's namespace.
+- **`mxc >= 0.4.1`** is needed only for RubyLLM's local code-execution sandbox.
+  Define permitted paths, network access, and runtime limits before exposing
+  code execution. It is not required for regular Ruby tools.
+- **`skill`** is an optional installer CLI, not an application runtime dependency.
+  RubyLLM includes a version-matched coding skill. To install it deliberately
+  into this project's coding-agent configuration after reviewing its contents:
+
+  ```bash
+  gem exec skill add "$(bundle show ruby_llm)" --skill rubyllm --agents coding
+  ```
+
+- **OpenTelemetry** can use the native integration with your chosen SDK and
+  exporter when you have a tracing destination. It is not enabled by default.
+- **ArchSpec** can add development-time architecture checks; **Kamal Backup**
+  can support a deployed app. Neither is required for the local AI baseline.
+
+See the official [ecosystem](https://rubyllm.com/ecosystem/),
+[sandbox](https://rubyllm.com/sandboxes/), and
+[skills](https://rubyllm.com/skills/) guides. Upgrade dependencies against the
+[starter and platform compatibility plan](rubyllm-upgrade.md).
 
 ## Decision Guide: Tool or Agent Task?
 

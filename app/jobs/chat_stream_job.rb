@@ -5,6 +5,8 @@ class ChatStreamJob < AsyncQueueJob
   
   # How often to poll DB for cancellation (seconds)
   STOP_CHECK_INTERVAL = ENV.fetch('CHAT_STOP_CHECK_INTERVAL', 0.3).to_f
+  CLAIM_RETRY_WAIT = 2.seconds
+  CLAIM_RETRY_LIMIT = 150
 
   # user_msg_id is nil for task continuation runs (no user message triggers them).
   # options may include sender_member_id and sender_user_id for continuation context.
@@ -13,18 +15,34 @@ class ChatStreamJob < AsyncQueueJob
     @task_continuation = @options[:task_continuation] == true
     @approval_resume = @options[:approval_resume] == true
     @chat_run = ChatRun.find(chat_run_id)
+    RubyLLM.with_owner(@chat_run) { perform_run(chat_id, user_msg_id) }
+  end
+
+  private def perform_run(chat_id, user_msg_id)
+    return unless @chat_run.active?
+    if @chat_run.chat.running?
+      # A new turn can arrive before the previous run releases its native
+      # claim. Keep that turn queued; duplicate deliveries of the running turn
+      # itself still leave the worker that owns it alone.
+      return retry_after_claim(chat_id, user_msg_id) if @chat_run.status_pending? || @options[:claim_retries].to_i.positive?
+      return
+    end
+
     setup_chat(chat_id, user_msg_id)
 
     @last_stop_check = Time.current
     return if stopped?
 
-    # Recover from incomplete tool chains left by previous crashed runs.
-    # Must run before streaming — broken chains cause API errors.
-    @chat.recover_from_tool_errors! unless @approval_resume
+    # Legacy unclaimed runs can leave broken history. RubyLLM 2.2 owns recovery
+    # for a claimed run cut off by a crash, so preserve its pending tool calls.
+    @chat.recover_from_tool_errors! unless @approval_resume || @chat.claim_token.present?
 
     @chat_run.update!(status: :running)
     stream_response
     return if stopped?
+    # A competing delivery can return without claiming the chat. It must not
+    # mark the process that actually owns the conversation loop complete.
+    return retry_after_claim(chat_id, user_msg_id) if @chat.running?
 
     # RubyLLM deliberately parks the completion loop before executing a tool
     # declared with `requires_approval`. Persist enough metadata for an
@@ -65,16 +83,26 @@ class ChatStreamJob < AsyncQueueJob
 
     @llm_msg&.broadcast_upsert_to_chat!
     @chat_run
+  rescue RubyLLM::ToolRoundLimitError
+    # This is an intentional stop, not a retryable provider failure. RubyLLM
+    # has saved the completed tool results; keep them for the next user turn.
+    @chat_run.reload
+    unless @chat_run.status_cancelled?
+      @chat_run.update!(status: :failed)
+      @llm_msg = @chat.messages.create!(
+        role: :assistant,
+        content: "I reached this response's tool limit. Send another message to continue."
+      )
+      @llm_msg.broadcast_append_to_chat
+    end
   rescue RubyLLM::Error => e
     # RubyLLM errors (including tool call mismatches from cancellation race)
     Rails.logger.error "[ChatStreamJob] RubyLLM error: #{e.class} - #{e.message}"
 
-    # Context overflow recovery: detect via error-message regex, compact, retry once.
-    # We use string matching rather than a programmatic context-size check because
-    # provider token accounting differs between models and isn't reliably exposed
-    # before the request fails. One retry only — if compaction doesn't free enough
-    # space, surfacing the error is better than retrying indefinitely.
-    if e.message.match?(/context|token|length|too long/i) && !@overflow_retried
+    # RubyLLM distinguishes context overflow from quota and authentication errors.
+    # Compact and retry once; unrelated provider errors must not trigger another
+    # paid summarization request.
+    if e.is_a?(RubyLLM::ContextLengthExceededError) && !@overflow_retried
       @overflow_retried = true
       if Chat::CompactionService.new(@chat).compact_on_overflow!
         @chat.messages.reset  # Clear AR cache so retry sees compacted=true
@@ -124,6 +152,20 @@ class ChatStreamJob < AsyncQueueJob
   end
 
   private
+
+  def retry_after_claim(chat_id, user_msg_id)
+    attempts = @options[:claim_retries].to_i
+    if attempts >= CLAIM_RETRY_LIMIT
+      @chat_run.update!(status: :failed)
+      @chat ||= Chat.find(chat_id)
+      persist_error_message("The previous response is still running. Please try again when it finishes.")
+      return
+    end
+
+    self.class.set(wait: CLAIM_RETRY_WAIT).perform_later(
+      chat_id, user_msg_id, @chat_run.id, @options.merge(claim_retries: attempts + 1)
+    )
+  end
   
   def stopped?
     # Throttle DB queries - only reload if interval has passed
@@ -150,9 +192,9 @@ class ChatStreamJob < AsyncQueueJob
       @user_msg = Message.find(user_msg_id)
       # Context about the user who SENT the message we're responding to
       # NOTE: In multi-workspace chats, sender may be from a different workspace than @chat.workspace
-      @sender_user = @user_msg.user
-      @sender_member = @user_msg.member
-      @sender_workspace = @user_msg.member.workspace
+      @sender_member = @user_msg.member || @chat_run.initiated_by_member
+      @sender_user = @user_msg.user || @sender_member&.user
+      @sender_workspace = @sender_member&.workspace
     else
       # Continuation mode: no user message triggered this run.
       # Sender context passed from the controller (the user who triggered the continuation).
@@ -265,6 +307,7 @@ class ChatStreamJob < AsyncQueueJob
     )
     tools = @toolset.tools
     @chat.with_tools(nil).with_tools(*tools)
+    @chat.with_tool_options(**Rails.configuration.x.llm.tool_options)
   end
 
   # Optional resilience features are explicit environment opt-ins. Keeping
@@ -656,13 +699,15 @@ class ChatStreamJob < AsyncQueueJob
   end
 
   def park_for_tool_approval!
-    return false unless @chat.awaiting_approval?
+    questions = @chat.pending_questions
+    return false if questions.empty?
 
     requested_at = Time.current.iso8601
-    @chat.pending_approvals.each do |tool_call|
+    questions.group_by { |question| question.tool_call.id }.each do |call_id, call_questions|
+      tool_call = @chat.find_tool_call(call_id)
       tool_call.update!(
         metadata: tool_call.metadata.merge(
-          "requires_approval" => true,
+          "requires_approval" => call_questions.any?(&:approval?),
           "chat_run_id" => @chat_run.id,
           "requester_member_id" => @sender_member&.id,
           "requester_user_id" => @sender_user&.id,
